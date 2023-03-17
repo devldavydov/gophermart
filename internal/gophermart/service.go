@@ -6,8 +6,11 @@ import (
 	"net/http"
 
 	"github.com/devldavydov/gophermart/internal/gophermart/handler"
+	"github.com/devldavydov/gophermart/internal/gophermart/storage"
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
+
+	_ "github.com/lib/pq"
 )
 
 type Service struct {
@@ -22,10 +25,22 @@ func NewService(settings *ServiceSettings, logger *logrus.Logger) *Service {
 func (s *Service) Start(ctx context.Context) error {
 	s.logger.Infof("Service started on [%s]", s.settings.RunAddress)
 
+	var stg storage.Storage
+	var err error
+
+	// Init storage
+	stg, err = storage.NewPgStorage(s.settings.DatabaseDsn, s.logger)
+	if err != nil {
+		return fmt.Errorf("failed to create storage: %w", err)
+	}
+	defer stg.Close()
+
+	// Init HTTP API
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.Default()
 	handler.Init(router)
 
+	// Start server
 	httpServer := &http.Server{
 		Addr:    fmt.Sprintf("%s:%s", s.settings.RunAddress.Hostname(), s.settings.RunAddress.Port()),
 		Handler: router,
