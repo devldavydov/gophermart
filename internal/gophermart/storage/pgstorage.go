@@ -11,13 +11,16 @@ import (
 )
 
 var (
-	ErrUserAlreadyExists = errors.New("user already exists")
-	ErrUserNotFound      = errors.New("user not found")
+	ErrUserAlreadyExists          = errors.New("user already exists")
+	ErrUserNotFound               = errors.New("user not found")
+	ErrOrderAlreadyExists         = errors.New("order already exists")
+	ErrOrderAlreadyExistsFromUser = errors.New("order already exists from user")
 )
 
 const (
 	_databaseRequestTimeout = 10 * time.Second
 	_userUniqueConstraint   = `duplicate key value violates unique constraint "users_username_key"`
+	_orderKeyConstraint     = `duplicate key value violates unique constraint "orders_pkey"`
 )
 
 type PgStorage struct {
@@ -87,13 +90,57 @@ func (pg *PgStorage) FindUser(login string) (int, string, error) {
 	return userId, userPassword, nil
 }
 
+func (pg *PgStorage) AddOrder(userId int, orderNum string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), _databaseRequestTimeout)
+	defer cancel()
+
+	foundUserOrder, err := pg.findUserOrder(userId, orderNum)
+	if err != nil {
+		return err
+	}
+
+	if foundUserOrder {
+		return ErrOrderAlreadyExistsFromUser
+	}
+
+	_, err = pg.db.ExecContext(ctx, _sqlAddOrder, orderNum, userId)
+	if err != nil {
+		pqErr := err.(*pq.Error)
+		if pqErr.Message == _orderKeyConstraint {
+			return ErrOrderAlreadyExists
+		}
+		return err
+	}
+
+	return nil
+}
+
+func (pg *PgStorage) findUserOrder(userId int, orderNum string) (bool, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), _databaseRequestTimeout)
+	defer cancel()
+
+	var dummy int
+	err := pg.db.QueryRowContext(ctx, _sqlFindUserOrder, orderNum, userId).Scan(&dummy)
+	switch {
+	case err == sql.ErrNoRows:
+		return false, nil
+	case err != nil:
+		return false, err
+	}
+
+	return true, err
+}
+
 func (pg *PgStorage) init() error {
 	ctx, cancel := context.WithTimeout(context.Background(), _databaseRequestTimeout)
 	defer cancel()
 
-	_, err := pg.db.ExecContext(ctx, _sqlCreateTableUser)
-	if err != nil {
-		return err
+	for _, createTbl := range []string{_sqlCreateTableUser, _sqlCreateTableOrders} {
+		_, err := pg.db.ExecContext(ctx, createTbl)
+		if err != nil {
+			return err
+		}
+
 	}
 
 	return nil
