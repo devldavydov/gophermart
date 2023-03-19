@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strconv"
+	"time"
 
 	_http "github.com/devldavydov/gophermart/internal/common/http"
 	"github.com/devldavydov/gophermart/internal/gophermart/auth"
@@ -19,6 +20,13 @@ const (
 	_orderAlreadyExistsFromUser = "Order already exists from user"
 	_orderAccepted              = "Order accepted"
 )
+
+type OrderItemsResponse struct {
+	Number     string    `json:"number"`
+	Status     string    `json:"status"`
+	Accrual    *int32    `json:"accrual,omitempty"`
+	UploadedAt time.Time `json:"uploaded_at"`
+}
 
 type OrderHandler struct {
 	stg    storage.Storage
@@ -67,7 +75,28 @@ func (oh *OrderHandler) AddOrder(c *gin.Context) {
 }
 
 func (oh *OrderHandler) ListOrders(c *gin.Context) {
-	c.String(http.StatusOK, "ListOrders\n")
+	dbItems, err := oh.stg.ListOrders(auth.GetUserId(c))
+	if err != nil {
+		if errors.Is(storage.ErrNoOrders, err) {
+			_http.CreateStatusResponse(c, http.StatusNoContent)
+			return
+		}
+
+		_http.CreateStatusResponse(c, http.StatusInternalServerError)
+		return
+	}
+
+	respItems := make([]OrderItemsResponse, 0, len(dbItems))
+	for _, dbItem := range dbItems {
+		respItems = append(respItems, OrderItemsResponse{
+			Number:     dbItem.Number,
+			Status:     dbItem.Status,
+			Accrual:    dbItem.Accrual,
+			UploadedAt: dbItem.UploadedAt,
+		})
+	}
+
+	c.JSON(http.StatusOK, respItems)
 }
 
 func checkNumLuhn(orderNum string) bool {

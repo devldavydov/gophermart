@@ -17,14 +17,14 @@ const (
 	_userWrongAuth     = "User wrong login/password"
 )
 
-type LoginHandler struct {
-	stg    storage.Storage
-	logger *logrus.Logger
-}
-
 type LoginReq struct {
 	Login    string `json:"login" binding:"required"`
 	Password string `json:"password" binding:"required"`
+}
+
+type LoginHandler struct {
+	stg    storage.Storage
+	logger *logrus.Logger
 }
 
 func NewLoginHandler(stg storage.Storage, logger *logrus.Logger) *LoginHandler {

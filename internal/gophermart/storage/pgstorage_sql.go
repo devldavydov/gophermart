@@ -44,4 +44,10 @@ const (
 	SELECT 1 FROM orders
 	WHERE number = $1 AND user_id = $2
 	`
+	_sqlListOrders = `
+	SELECT number, status, accrual, uploaded_at
+	FROM orders
+	WHERE user_id = $1
+	ORDER BY uploaded_at ASC
+	`
 )

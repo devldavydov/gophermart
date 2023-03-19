@@ -15,6 +15,7 @@ var (
 	ErrUserNotFound               = errors.New("user not found")
 	ErrOrderAlreadyExists         = errors.New("order already exists")
 	ErrOrderAlreadyExistsFromUser = errors.New("order already exists from user")
+	ErrNoOrders                   = errors.New("no orders")
 )
 
 const (
@@ -113,6 +114,48 @@ func (pg *PgStorage) AddOrder(userId int, orderNum string) error {
 	}
 
 	return nil
+}
+
+func (pg *PgStorage) ListOrders(userId int) ([]OrderItem, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), _databaseRequestTimeout)
+	defer cancel()
+
+	rows, err := pg.db.QueryContext(ctx, _sqlListOrders, userId)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var items []OrderItem
+
+	for rows.Next() {
+		var r orderItemRow
+		err = rows.Scan(&r.number, &r.status, &r.accrual, &r.uploadedAt)
+		if err != nil {
+			return nil, err
+		}
+
+		item := OrderItem{
+			Number:     r.number,
+			Status:     r.status,
+			UploadedAt: r.uploadedAt,
+		}
+		if r.accrual.Valid {
+			item.Accrual = &r.accrual.Int32
+		}
+
+		items = append(items, item)
+	}
+
+	if len(items) == 0 {
+		return nil, ErrNoOrders
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return items, nil
 }
 
 func (pg *PgStorage) findUserOrder(userId int, orderNum string) (bool, error) {

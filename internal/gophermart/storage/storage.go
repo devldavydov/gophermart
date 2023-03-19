@@ -1,8 +1,9 @@
 package storage
 
 type Storage interface {
-	CreateUser(string, string) (int, error)
-	FindUser(string) (int, string, error)
-	AddOrder(int, string) error
+	CreateUser(login, password string) (int, error)
+	FindUser(login string) (int, string, error)
+	AddOrder(userId int, orderNum string) error
+	ListOrders(userId int) ([]OrderItem, error)
 	Close()
 }
