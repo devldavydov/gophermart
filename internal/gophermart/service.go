@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/devldavydov/gophermart/internal/gophermart/auth"
+	"github.com/devldavydov/gophermart/internal/gophermart/compress"
 	"github.com/devldavydov/gophermart/internal/gophermart/handler"
 	"github.com/devldavydov/gophermart/internal/gophermart/storage"
 	"github.com/gin-gonic/gin"
@@ -39,6 +40,7 @@ func (s *Service) Start(ctx context.Context) error {
 	// Init HTTP API
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.Default()
+	compress.Init(router)
 	auth.Init(router, s.settings.SessionSecret)
 	handler.Init(router, stg, s.logger)
 
