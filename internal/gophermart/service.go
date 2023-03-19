@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/devldavydov/gophermart/internal/gophermart/auth"
 	"github.com/devldavydov/gophermart/internal/gophermart/handler"
 	"github.com/devldavydov/gophermart/internal/gophermart/storage"
 	"github.com/gin-gonic/gin"
@@ -38,7 +39,8 @@ func (s *Service) Start(ctx context.Context) error {
 	// Init HTTP API
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.Default()
-	handler.Init(router)
+	auth.Init(router, "secret")
+	handler.Init(router, stg, s.logger)
 
 	// Start server
 	httpServer := &http.Server{

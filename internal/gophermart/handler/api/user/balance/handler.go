@@ -3,13 +3,18 @@ package balance
 import (
 	"net/http"
 
+	"github.com/devldavydov/gophermart/internal/gophermart/storage"
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
 )
 
-type BalanceHandler struct{}
+type BalanceHandler struct {
+	stg    storage.Storage
+	logger *logrus.Logger
+}
 
-func NewBalanceHandler() *BalanceHandler {
-	return &BalanceHandler{}
+func NewBalanceHandler(stg storage.Storage, logger *logrus.Logger) *BalanceHandler {
+	return &BalanceHandler{stg: stg, logger: logger}
 }
 
 func (bh *BalanceHandler) GetBalance(c *gin.Context) {

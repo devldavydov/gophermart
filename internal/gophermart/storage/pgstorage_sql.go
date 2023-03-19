@@ -12,4 +12,13 @@ const (
 		UNIQUE(username)
 	);
 	`
+	_sqlCreateUser = `
+	INSERT INTO users (username, password)
+	VALUES ($1, $2)
+	RETURNING id
+	`
+	_sqlFindUser = `
+	SELECT id, password FROM users
+	WHERE username = $1
+	`
 )

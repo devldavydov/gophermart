@@ -35,6 +35,7 @@ func run() error {
 		return fmt.Errorf("failed to create service settings: %w", err)
 	}
 
+	serviceSettings.DatabaseDsn = "postgres://postgres:postgres@127.0.0.1:5432/praktikum?sslmode=disable"
 	service := gophermart.NewService(serviceSettings, logger)
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
