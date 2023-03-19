@@ -10,6 +10,6 @@ import (
 func Init(group *gin.RouterGroup, stg storage.Storage, logger *logrus.Logger) {
 	balanceHandler := NewBalanceHandler(stg, logger)
 	group.GET("/balance", auth.AuthRequired, balanceHandler.GetBalance)
-	group.POST("/balance/withdraw", balanceHandler.BalanceWithdraw)
-	group.GET("/withdrawals", balanceHandler.ListWithdrawals)
+	group.POST("/balance/withdraw", auth.AuthRequired, balanceHandler.BalanceWithdraw)
+	group.GET("/withdrawals", auth.AuthRequired, balanceHandler.ListWithdrawals)
 }

@@ -15,6 +15,7 @@ const (
 	_defaultRunAddress           = "127.0.0.1:8080"
 	_defaultDatabaseDsn          = ""
 	_defaultAccrualSystemAddress = "127.0.0.1:9090"
+	_defaultSessionSecret        = "secret"
 	_defaultShutdownTimeout      = 10 * time.Second
 )
 
@@ -23,6 +24,7 @@ type Config struct {
 	RunAddress           string
 	DatabaseDsn          string
 	AccrualSystemAddress string
+	SessionSecret        string
 	ShutdownTimeout      time.Duration
 }
 
@@ -35,6 +37,7 @@ func LoadConfig(flagSet flag.FlagSet, flags []string) (*Config, error) {
 	flagSet.StringVar(&config.RunAddress, "a", _defaultRunAddress, "run address")
 	flagSet.StringVar(&config.DatabaseDsn, "d", _defaultDatabaseDsn, "database uri")
 	flagSet.StringVar(&config.AccrualSystemAddress, "r", _defaultAccrualSystemAddress, "accrual system address")
+	flagSet.StringVar(&config.SessionSecret, "s", _defaultSessionSecret, "session secret")
 	flagSet.DurationVar(&config.ShutdownTimeout, "t", _defaultShutdownTimeout, "shutdown timeout")
 
 	flagSet.Usage = func() {
@@ -67,6 +70,11 @@ func LoadConfig(flagSet flag.FlagSet, flags []string) (*Config, error) {
 		return nil, err
 	}
 
+	config.SessionSecret, err = env.GetVariable("SESSION_SECRET", env.CastString, config.SessionSecret)
+	if err != nil {
+		return nil, err
+	}
+
 	config.ShutdownTimeout, err = env.GetVariable("SHUTDOWN_TIMEOUT", env.CastDuration, config.ShutdownTimeout)
 	if err != nil {
 		return nil, err
@@ -80,6 +88,7 @@ func ServiceSettingsAdapt(config *Config) (*gophermart.ServiceSettings, error) {
 		"http://"+config.RunAddress,
 		config.DatabaseDsn,
 		"http://"+config.AccrualSystemAddress,
+		config.SessionSecret,
 		config.ShutdownTimeout,
 	)
 	if err != nil {

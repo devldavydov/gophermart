@@ -9,10 +9,11 @@ type ServiceSettings struct {
 	RunAddress           *url.URL
 	DatabaseDsn          string
 	AccrualSystemAddress *url.URL
+	SessionSecret        string
 	ShutdownTimeout      time.Duration
 }
 
-func NewServiceSettings(runAddress, databaseDsn, accrualSystemAddress string, shutdownTimeout time.Duration) (*ServiceSettings, error) {
+func NewServiceSettings(runAddress, databaseDsn, accrualSystemAddress string, sessionSecret string, shutdownTimeout time.Duration) (*ServiceSettings, error) {
 	urlRunAddress, err := url.ParseRequestURI(runAddress)
 	if err != nil {
 		return nil, err
@@ -27,6 +28,7 @@ func NewServiceSettings(runAddress, databaseDsn, accrualSystemAddress string, sh
 		RunAddress:           urlRunAddress,
 		DatabaseDsn:          databaseDsn,
 		AccrualSystemAddress: urlAccrualSystemAddress,
+		SessionSecret:        sessionSecret,
 		ShutdownTimeout:      shutdownTimeout,
 	}, nil
 }

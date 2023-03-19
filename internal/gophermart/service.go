@@ -39,7 +39,7 @@ func (s *Service) Start(ctx context.Context) error {
 	// Init HTTP API
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.Default()
-	auth.Init(router, "secret")
+	auth.Init(router, s.settings.SessionSecret)
 	handler.Init(router, stg, s.logger)
 
 	// Start server

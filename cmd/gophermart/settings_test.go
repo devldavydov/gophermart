@@ -22,6 +22,7 @@ func TestServiceSettingsAdaptDefault(t *testing.T) {
 	assert.Equal(t, expRunAddress, serviceSettings.RunAddress)
 	assert.Equal(t, "", serviceSettings.DatabaseDsn)
 	assert.Equal(t, expAccrAddress, serviceSettings.AccrualSystemAddress)
+	assert.Equal(t, "secret", serviceSettings.SessionSecret)
 	assert.Equal(t, 10*time.Second, serviceSettings.ShutdownTimeout)
 }
 
@@ -29,6 +30,7 @@ func TestServiceSettingsAdaptCustomEnv(t *testing.T) {
 	t.Setenv("RUN_ADDRESS", "1.1.1.1:9999")
 	t.Setenv("DATABASE_URI", "postgre:1234")
 	t.Setenv("ACCRUAL_SYSTEM_ADDRESS", "2.2.2.2:9999")
+	t.Setenv("SESSION_SECRET", "foobar")
 	t.Setenv("SHUTDOWN_TIMEOUT", "5s")
 
 	testFlagSet := flag.NewFlagSet("test", flag.ExitOnError)
@@ -43,12 +45,15 @@ func TestServiceSettingsAdaptCustomEnv(t *testing.T) {
 	assert.Equal(t, expRunAddress, serviceSettings.RunAddress)
 	assert.Equal(t, "postgre:1234", serviceSettings.DatabaseDsn)
 	assert.Equal(t, expAccrAddress, serviceSettings.AccrualSystemAddress)
+	assert.Equal(t, "foobar", serviceSettings.SessionSecret)
 	assert.Equal(t, 5*time.Second, serviceSettings.ShutdownTimeout)
 }
 
 func TestServiceSettingsAdaptCustomFlag(t *testing.T) {
 	testFlagSet := flag.NewFlagSet("test", flag.ExitOnError)
-	config, err := LoadConfig(*testFlagSet, []string{"-a", "1.1.1.1:9999", "-d", "postgre:1234", "-r", "2.2.2.2:9999", "-t", "5s"})
+	config, err := LoadConfig(
+		*testFlagSet,
+		[]string{"-a", "1.1.1.1:9999", "-d", "postgre:1234", "-r", "2.2.2.2:9999", "-t", "5s", "-s", "foobar"})
 	assert.NoError(t, err)
 
 	serviceSettings, err := ServiceSettingsAdapt(config)
@@ -59,6 +64,7 @@ func TestServiceSettingsAdaptCustomFlag(t *testing.T) {
 	assert.Equal(t, expRunAddress, serviceSettings.RunAddress)
 	assert.Equal(t, "postgre:1234", serviceSettings.DatabaseDsn)
 	assert.Equal(t, expAccrAddress, serviceSettings.AccrualSystemAddress)
+	assert.Equal(t, "foobar", serviceSettings.SessionSecret)
 	assert.Equal(t, 5*time.Second, serviceSettings.ShutdownTimeout)
 }
 
@@ -66,10 +72,13 @@ func TestServiceSettingsAdaptCustomEnvAndFlag(t *testing.T) {
 	t.Setenv("RUN_ADDRESS", "3.3.3.3:9999")
 	t.Setenv("DATABASE_URI", "postgre:4567")
 	t.Setenv("ACCRUAL_SYSTEM_ADDRESS", "3.3.3.3:9999")
+	t.Setenv("SESSION_SECRET", "fuzzbuzz")
 	t.Setenv("SHUTDOWN_TIMEOUT", "50s")
 
 	testFlagSet := flag.NewFlagSet("test", flag.ExitOnError)
-	config, err := LoadConfig(*testFlagSet, []string{"-a", "1.1.1.1:9999", "-d", "postgre:1234", "-r", "2.2.2.2:9999", "-t", "5s"})
+	config, err := LoadConfig(
+		*testFlagSet,
+		[]string{"-a", "1.1.1.1:9999", "-d", "postgre:1234", "-r", "2.2.2.2:9999", "-t", "5s", "-s", "foobar"})
 	assert.NoError(t, err)
 
 	serviceSettings, err := ServiceSettingsAdapt(config)
@@ -80,6 +89,7 @@ func TestServiceSettingsAdaptCustomEnvAndFlag(t *testing.T) {
 	assert.Equal(t, expRunAddress, serviceSettings.RunAddress)
 	assert.Equal(t, "postgre:4567", serviceSettings.DatabaseDsn)
 	assert.Equal(t, expAccrAddress, serviceSettings.AccrualSystemAddress)
+	assert.Equal(t, "fuzzbuzz", serviceSettings.SessionSecret)
 	assert.Equal(t, 50*time.Second, serviceSettings.ShutdownTimeout)
 }
 
@@ -99,6 +109,7 @@ func TestServiceSettingsAdaptCustomEnvAndFlagMix(t *testing.T) {
 	assert.Equal(t, expRunAddress, serviceSettings.RunAddress)
 	assert.Equal(t, "postgre:4567", serviceSettings.DatabaseDsn)
 	assert.Equal(t, expAccrAddress, serviceSettings.AccrualSystemAddress)
+	assert.Equal(t, "secret", serviceSettings.SessionSecret)
 	assert.Equal(t, 10*time.Second, serviceSettings.ShutdownTimeout)
 }
 
