@@ -61,8 +61,14 @@ func (pg *PgStorage) CreateUser(login, password string) (int, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), _databaseRequestTimeout)
 	defer cancel()
 
+	tx, err := pg.db.Begin()
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback()
+
 	var userId int
-	err := pg.db.QueryRowContext(ctx, _sqlCreateUser, login, password).Scan(&userId)
+	err = tx.QueryRowContext(ctx, _sqlCreateUser, login, password).Scan(&userId)
 	if err != nil {
 		pqErr := err.(*pq.Error)
 		if pqErr.Message == _userUniqueConstraint {
@@ -71,7 +77,12 @@ func (pg *PgStorage) CreateUser(login, password string) (int, error) {
 		return 0, err
 	}
 
-	return userId, nil
+	_, err = tx.ExecContext(ctx, _sqlCreateUserBalance, userId)
+	if err != nil {
+		return 0, err
+	}
+
+	return userId, tx.Commit()
 }
 
 func (pg *PgStorage) FindUser(login string) (int, string, error) {
@@ -158,6 +169,19 @@ func (pg *PgStorage) ListOrders(userId int) ([]OrderItem, error) {
 	return items, nil
 }
 
+func (pg *PgStorage) GetBalance(userId int) (*Balance, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), _databaseRequestTimeout)
+	defer cancel()
+
+	var balance Balance
+	err := pg.db.QueryRowContext(ctx, _sqlGetUserBalance, userId).Scan(&balance.Current, &balance.Withdrawn)
+	if err != nil {
+		return nil, err
+	}
+
+	return &balance, nil
+}
+
 func (pg *PgStorage) findUserOrder(userId int, orderNum string) (bool, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), _databaseRequestTimeout)
 	defer cancel()
@@ -178,7 +202,7 @@ func (pg *PgStorage) init() error {
 	ctx, cancel := context.WithTimeout(context.Background(), _databaseRequestTimeout)
 	defer cancel()
 
-	for _, createTbl := range []string{_sqlCreateTableUser, _sqlCreateTableOrders} {
+	for _, createTbl := range []string{_sqlCreateTableUser, _sqlCreateTableOrders, _sqlCreateTableBalance} {
 		_, err := pg.db.ExecContext(ctx, createTbl)
 		if err != nil {
 			return err

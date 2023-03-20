@@ -18,3 +18,8 @@ type orderItemRow struct {
 	accrual    sql.NullInt32
 	uploadedAt time.Time
 }
+
+type Balance struct {
+	Current   float64
+	Withdrawn float64
+}

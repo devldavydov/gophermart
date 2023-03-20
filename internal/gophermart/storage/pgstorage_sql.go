@@ -50,4 +50,24 @@ const (
 	WHERE user_id = $1
 	ORDER BY uploaded_at ASC
 	`
+	// balance
+	_sqlCreateTableBalance = `
+	CREATE TABLE IF NOT EXISTS balance (
+		user_id   int              NOT NULL,
+		current   double precision NOT NULL DEFAULT 0,
+		withdrawn double precision NOT NULL DEFAULT 0,
+
+		PRIMARY KEY (user_id),
+		FOREIGN KEY(user_id) REFERENCES users(id),
+		CHECK(current >= 0)
+	);
+	`
+	_sqlCreateUserBalance = `
+	INSERT INTO balance (user_id)
+	VALUES ($1)
+	`
+	_sqlGetUserBalance = `
+	SELECT current, withdrawn FROM balance
+	WHERE user_id = $1
+	`
 )

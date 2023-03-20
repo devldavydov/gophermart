@@ -5,5 +5,6 @@ type Storage interface {
 	FindUser(login string) (int, string, error)
 	AddOrder(userId int, orderNum string) error
 	ListOrders(userId int) ([]OrderItem, error)
+	GetBalance(userId int) (*Balance, error)
 	Close()
 }
