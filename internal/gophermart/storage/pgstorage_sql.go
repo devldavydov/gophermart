@@ -70,6 +70,11 @@ const (
 	SELECT current, withdrawn FROM balance
 	WHERE user_id = $1
 	`
+	_sqlUpdateUserBalance = `
+	UPDATE balance
+	SET current = current - $2, withdrawn = withdrawn + $2
+	WHERE user_id = $1
+	`
 	// withdrawals
 	_sqlCreateTableWithdrawals = `
 	CREATE TABLE IF NOT EXISTS withdrawals (
@@ -89,5 +94,9 @@ const (
 	FROM withdrawals
 	WHERE user_id = $1
 	ORDER BY processed_at ASC
+	`
+	_sqlAddWithdrawal = `
+	INSERT INTO withdrawals (user_id, order_num, sum)
+	VALUES ($1, $2, $3)
 	`
 )

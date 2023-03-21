@@ -17,12 +17,14 @@ var (
 	ErrOrderAlreadyExistsFromUser = errors.New("order already exists from user")
 	ErrNoOrders                   = errors.New("no orders")
 	ErrNoWithdrawals              = errors.New("no withdrawals")
+	ErrNotEnoughBalance           = errors.New("not enough balance")
 )
 
 const (
 	_databaseRequestTimeout = 10 * time.Second
 	_userUniqueConstraint   = `duplicate key value violates unique constraint "users_username_key"`
 	_orderKeyConstraint     = `duplicate key value violates unique constraint "orders_pkey"`
+	_balanceSumConstraint   = `new row for relation "balance" violates check constraint "balance_current_check"`
 )
 
 type PgStorage struct {
@@ -214,6 +216,35 @@ func (pg *PgStorage) ListWithdrawals(userId int) ([]WithdrawalItem, error) {
 	}
 
 	return items, nil
+}
+
+func (pg *PgStorage) BalanceWithdraw(userId int, orderNum string, sum float64) error {
+	ctx, cancel := context.WithTimeout(context.Background(), _databaseRequestTimeout)
+	defer cancel()
+
+	tx, err := pg.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// Update balance
+	_, err = tx.ExecContext(ctx, _sqlUpdateUserBalance, userId, sum)
+	if err != nil {
+		pqErr := err.(*pq.Error)
+		if pqErr.Message == _balanceSumConstraint {
+			return ErrNotEnoughBalance
+		}
+		return err
+	}
+
+	// Insert withdrawal record
+	_, err = tx.ExecContext(ctx, _sqlAddWithdrawal, userId, orderNum, sum)
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit()
 }
 
 func (pg *PgStorage) findUserOrder(userId int, orderNum string) (bool, error) {

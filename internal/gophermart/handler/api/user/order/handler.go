@@ -4,15 +4,14 @@ import (
 	"errors"
 	"io/ioutil"
 	"net/http"
-	"strconv"
 	"time"
 
 	_http "github.com/devldavydov/gophermart/internal/common/http"
+	"github.com/devldavydov/gophermart/internal/common/luhn"
 	"github.com/devldavydov/gophermart/internal/gophermart/auth"
 	"github.com/devldavydov/gophermart/internal/gophermart/storage"
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
-	"github.com/theplant/luhn"
 )
 
 const (
@@ -50,7 +49,7 @@ func (oh *OrderHandler) AddOrder(c *gin.Context) {
 	}
 
 	orderNum := string(orderNumBytes)
-	if !checkNumLuhn(orderNum) {
+	if !luhn.CheckNum(orderNum) {
 		_http.CreateStatusResponse(c, http.StatusUnprocessableEntity)
 		return
 	}
@@ -97,12 +96,4 @@ func (oh *OrderHandler) ListOrders(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, respItems)
-}
-
-func checkNumLuhn(orderNum string) bool {
-	order, err := strconv.Atoi(orderNum)
-	if err != nil {
-		return false
-	}
-	return luhn.Valid(order)
 }

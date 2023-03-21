@@ -6,11 +6,14 @@ import (
 	"time"
 
 	_http "github.com/devldavydov/gophermart/internal/common/http"
+	"github.com/devldavydov/gophermart/internal/common/luhn"
 	"github.com/devldavydov/gophermart/internal/gophermart/auth"
 	"github.com/devldavydov/gophermart/internal/gophermart/storage"
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 )
+
+const _notEnougnBalance = "Not enough balance"
 
 type BalanceResponse struct {
 	Current   float64 `json:"current"`
@@ -21,6 +24,11 @@ type WithdrawalItemResponse struct {
 	Order       string    `json:"order"`
 	Sum         float64   `json:"sum"`
 	ProcessedAt time.Time `json:"processed_at"`
+}
+
+type BalanceWithdrawReq struct {
+	Order string  `json:"order" binding:"required"`
+	Sum   float64 `json:"sum" binding:"required"`
 }
 
 type BalanceHandler struct {
@@ -47,7 +55,30 @@ func (bh *BalanceHandler) GetBalance(c *gin.Context) {
 }
 
 func (bh *BalanceHandler) BalanceWithdraw(c *gin.Context) {
-	c.String(http.StatusOK, "BalanceWithdraw\n")
+	var req BalanceWithdrawReq
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		_http.CreateStatusResponse(c, http.StatusBadRequest)
+		return
+	}
+
+	if !luhn.CheckNum(req.Order) {
+		_http.CreateStatusResponse(c, http.StatusUnprocessableEntity)
+		return
+	}
+
+	err := bh.stg.BalanceWithdraw(auth.GetUserId(c), req.Order, req.Sum)
+	if err != nil {
+		if errors.Is(storage.ErrNotEnoughBalance, err) {
+			c.String(http.StatusPaymentRequired, _notEnougnBalance)
+			return
+		}
+
+		_http.CreateStatusResponse(c, http.StatusInternalServerError)
+		return
+	}
+
+	_http.CreateStatusResponse(c, http.StatusOK)
 }
 
 func (bh *BalanceHandler) ListWithdrawals(c *gin.Context) {
