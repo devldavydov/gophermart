@@ -16,6 +16,7 @@ var (
 	ErrOrderAlreadyExists         = errors.New("order already exists")
 	ErrOrderAlreadyExistsFromUser = errors.New("order already exists from user")
 	ErrNoOrders                   = errors.New("no orders")
+	ErrNoWithdrawals              = errors.New("no withdrawals")
 )
 
 const (
@@ -182,6 +183,39 @@ func (pg *PgStorage) GetBalance(userId int) (*Balance, error) {
 	return &balance, nil
 }
 
+func (pg *PgStorage) ListWithdrawals(userId int) ([]WithdrawalItem, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), _databaseRequestTimeout)
+	defer cancel()
+
+	rows, err := pg.db.QueryContext(ctx, _sqlListWithdrawals, userId)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var items []WithdrawalItem
+
+	for rows.Next() {
+		var item WithdrawalItem
+		err = rows.Scan(&item.Order, &item.Sum, &item.ProcessedAt)
+		if err != nil {
+			return nil, err
+		}
+
+		items = append(items, item)
+	}
+
+	if len(items) == 0 {
+		return nil, ErrNoWithdrawals
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return items, nil
+}
+
 func (pg *PgStorage) findUserOrder(userId int, orderNum string) (bool, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), _databaseRequestTimeout)
 	defer cancel()
@@ -202,7 +236,7 @@ func (pg *PgStorage) init() error {
 	ctx, cancel := context.WithTimeout(context.Background(), _databaseRequestTimeout)
 	defer cancel()
 
-	for _, createTbl := range []string{_sqlCreateTableUser, _sqlCreateTableOrders, _sqlCreateTableBalance} {
+	for _, createTbl := range []string{_sqlCreateTableUser, _sqlCreateTableOrders, _sqlCreateTableBalance, _sqlCreateTableWithdrawals} {
 		_, err := pg.db.ExecContext(ctx, createTbl)
 		if err != nil {
 			return err

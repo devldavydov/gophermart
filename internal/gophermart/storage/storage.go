@@ -6,5 +6,6 @@ type Storage interface {
 	AddOrder(userId int, orderNum string) error
 	ListOrders(userId int) ([]OrderItem, error)
 	GetBalance(userId int) (*Balance, error)
+	ListWithdrawals(userId int) ([]WithdrawalItem, error)
 	Close()
 }

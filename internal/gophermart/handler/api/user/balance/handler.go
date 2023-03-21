@@ -1,7 +1,9 @@
 package balance
 
 import (
+	"errors"
 	"net/http"
+	"time"
 
 	_http "github.com/devldavydov/gophermart/internal/common/http"
 	"github.com/devldavydov/gophermart/internal/gophermart/auth"
@@ -13,6 +15,12 @@ import (
 type BalanceResponse struct {
 	Current   float64 `json:"current"`
 	Withdrawn float64 `json:"withdrawn"`
+}
+
+type WithdrawalItemResponse struct {
+	Order       string    `json:"order"`
+	Sum         float64   `json:"sum"`
+	ProcessedAt time.Time `json:"processed_at"`
 }
 
 type BalanceHandler struct {
@@ -43,5 +51,25 @@ func (bh *BalanceHandler) BalanceWithdraw(c *gin.Context) {
 }
 
 func (bh *BalanceHandler) ListWithdrawals(c *gin.Context) {
-	c.String(http.StatusOK, "ListWithdrawals\n")
+	dbItems, err := bh.stg.ListWithdrawals(auth.GetUserId(c))
+	if err != nil {
+		if errors.Is(storage.ErrNoWithdrawals, err) {
+			_http.CreateStatusResponse(c, http.StatusNoContent)
+			return
+		}
+
+		_http.CreateStatusResponse(c, http.StatusInternalServerError)
+		return
+	}
+
+	respItems := make([]WithdrawalItemResponse, 0, len(dbItems))
+	for _, item := range dbItems {
+		respItems = append(respItems, WithdrawalItemResponse{
+			Order:       item.Order,
+			Sum:         item.Sum,
+			ProcessedAt: item.ProcessedAt,
+		})
+	}
+
+	c.JSON(http.StatusOK, respItems)
 }

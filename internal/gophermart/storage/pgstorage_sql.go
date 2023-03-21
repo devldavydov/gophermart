@@ -70,4 +70,24 @@ const (
 	SELECT current, withdrawn FROM balance
 	WHERE user_id = $1
 	`
+	// withdrawals
+	_sqlCreateTableWithdrawals = `
+	CREATE TABLE IF NOT EXISTS withdrawals (
+		id           serial                   NOT NULL,
+		user_id      int                      NOT NULL,
+		order_num    text                     NOT NULL,
+		sum          double precision         NOT NULL,
+		processed_at timestamp with time zone NOT NULL DEFAULT now(),
+
+		PRIMARY KEY(id),
+		FOREIGN KEY(user_id) REFERENCES users(id),
+		CHECK(sum > 0)
+	);
+	`
+	_sqlListWithdrawals = `
+	SELECT order_num, sum, processed_at
+	FROM withdrawals
+	WHERE user_id = $1
+	ORDER BY processed_at ASC
+	`
 )
