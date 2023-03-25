@@ -1,15 +1,9 @@
 package luhn
 
 import (
-	"strconv"
-
-	"github.com/theplant/luhn"
+	"github.com/ShiraazMoollatjie/goluhn"
 )
 
 func CheckNum(orderNum string) bool {
-	order, err := strconv.Atoi(orderNum)
-	if err != nil {
-		return false
-	}
-	return luhn.Valid(order)
+	return goluhn.Validate(orderNum) == nil
 }

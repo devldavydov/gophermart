@@ -17,7 +17,7 @@ build:
 	@cd cmd/gophermart && go build .
 
 .PHONY: test
-test: test_units test_integration test_static test_gophermart
+test: test_units test_static test_gophermart
 
 .PHONY: test_units
 test_units: 

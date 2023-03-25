@@ -25,7 +25,7 @@ type GophermartSuite struct {
 func (gs *GophermartSuite) SetupSuite() {
 	jar, _ := cookiejar.New(nil)
 	gs.httpClient = resty.New().
-		SetHostURL(os.Getenv(_envGophermartSrvAddr)).
+		SetBaseURL(os.Getenv(_envGophermartSrvAddr)).
 		SetCookieJar(jar)
 
 	gs.accrualSrvListenAddr = os.Getenv(_envAccrualSrvListenAddr)

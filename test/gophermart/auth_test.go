@@ -60,6 +60,7 @@ func (gs *GophermartSuite) TestRegisterLoginLogout() {
 	// Logout
 	resp, err = gs.httpClient.R().Post("/api/user/logout")
 	assert.NoError(gs.T(), err)
+	assert.Equal(gs.T(), http.StatusOK, resp.StatusCode())
 
 	// Try url after logout
 	resp, err = gs.httpClient.R().Get("/api/user/balance")
