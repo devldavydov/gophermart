@@ -17,12 +17,20 @@ build:
 	@cd cmd/gophermart && go build .
 
 .PHONY: test
-test: test_units test_static test_gophermart
+test: test_units test_integration test_static test_gophermart
 
 .PHONY: test_units
 test_units: 
 	@echo "\n### $@"
 	@go test ./... -v --count 1
+
+.PHONY: test_integration
+test_integration: 
+	@echo "\n### $@"
+	@echo "DON'T FORGET TO START postgres.sh AND cmd/gophermart/gophermart\n"
+	@export TEST_GOPHERMART_SRV_ADDR=http://127.0.0.1:8080 && \
+	 export TEST_ACCRUAL_SRV_LISTEN_ADDR=127.0.0.1:9090 && \
+	 go test ./... -v -run=^TestGophermartIntegration$$ --count 1
 
 .PHONY: test_static
 test_static:
