@@ -46,7 +46,7 @@ func (lh *LoginHandler) Register(c *gin.Context) {
 		return
 	}
 
-	userId, err := lh.stg.CreateUser(req.Login, pwdHash)
+	userID, err := lh.stg.CreateUser(req.Login, pwdHash)
 	if err != nil {
 		if errors.Is(storage.ErrUserAlreadyExists, err) {
 			c.String(http.StatusConflict, _userAlreadyExists)
@@ -57,7 +57,7 @@ func (lh *LoginHandler) Register(c *gin.Context) {
 		return
 	}
 
-	if err = auth.SetUserId(c, userId); err != nil {
+	if err = auth.SetUserID(c, userID); err != nil {
 		_http.CreateStatusResponse(c, http.StatusInternalServerError)
 		return
 	}
@@ -73,7 +73,7 @@ func (lh *LoginHandler) Login(c *gin.Context) {
 		return
 	}
 
-	userId, pwdHash, err := lh.stg.FindUser(req.Login)
+	userID, pwdHash, err := lh.stg.FindUser(req.Login)
 	if err != nil {
 		if errors.Is(storage.ErrUserNotFound, err) {
 			c.String(http.StatusUnauthorized, _userWrongAuth)
@@ -90,7 +90,7 @@ func (lh *LoginHandler) Login(c *gin.Context) {
 		return
 	}
 
-	if err = auth.SetUserId(c, userId); err != nil {
+	if err = auth.SetUserID(c, userID); err != nil {
 		_http.CreateStatusResponse(c, http.StatusInternalServerError)
 		return
 	}
@@ -99,7 +99,7 @@ func (lh *LoginHandler) Login(c *gin.Context) {
 }
 
 func (lh *LoginHandler) Logout(c *gin.Context) {
-	if err := auth.DelUserId(c); err != nil {
+	if err := auth.DelUserID(c); err != nil {
 		_http.CreateStatusResponse(c, http.StatusInternalServerError)
 		return
 	}

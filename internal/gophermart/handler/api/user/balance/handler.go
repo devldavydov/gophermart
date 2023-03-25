@@ -41,7 +41,7 @@ func NewBalanceHandler(stg storage.Storage, logger *logrus.Logger) *BalanceHandl
 }
 
 func (bh *BalanceHandler) GetBalance(c *gin.Context) {
-	dbBalance, err := bh.stg.GetBalance(auth.GetUserId(c))
+	dbBalance, err := bh.stg.GetBalance(auth.GetUserID(c))
 	if err != nil {
 		_http.CreateStatusResponse(c, http.StatusInternalServerError)
 		return
@@ -67,7 +67,7 @@ func (bh *BalanceHandler) BalanceWithdraw(c *gin.Context) {
 		return
 	}
 
-	err := bh.stg.BalanceWithdraw(auth.GetUserId(c), req.Order, req.Sum)
+	err := bh.stg.BalanceWithdraw(auth.GetUserID(c), req.Order, req.Sum)
 	if err != nil {
 		if errors.Is(storage.ErrNotEnoughBalance, err) {
 			c.String(http.StatusPaymentRequired, _notEnougnBalance)
@@ -82,7 +82,7 @@ func (bh *BalanceHandler) BalanceWithdraw(c *gin.Context) {
 }
 
 func (bh *BalanceHandler) ListWithdrawals(c *gin.Context) {
-	dbItems, err := bh.stg.ListWithdrawals(auth.GetUserId(c))
+	dbItems, err := bh.stg.ListWithdrawals(auth.GetUserID(c))
 	if err != nil {
 		if errors.Is(storage.ErrNoWithdrawals, err) {
 			_http.CreateStatusResponse(c, http.StatusNoContent)

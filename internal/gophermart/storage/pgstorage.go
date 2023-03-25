@@ -70,8 +70,8 @@ func (pg *PgStorage) CreateUser(login, password string) (int, error) {
 	}
 	defer tx.Rollback()
 
-	var userId int
-	err = tx.QueryRowContext(ctx, _sqlCreateUser, login, password).Scan(&userId)
+	var userID int
+	err = tx.QueryRowContext(ctx, _sqlCreateUser, login, password).Scan(&userID)
 	if err != nil {
 		pqErr := err.(*pq.Error)
 		if pqErr.Message == _userUniqueConstraint {
@@ -80,21 +80,21 @@ func (pg *PgStorage) CreateUser(login, password string) (int, error) {
 		return 0, err
 	}
 
-	_, err = tx.ExecContext(ctx, _sqlCreateUserBalance, userId)
+	_, err = tx.ExecContext(ctx, _sqlCreateUserBalance, userID)
 	if err != nil {
 		return 0, err
 	}
 
-	return userId, tx.Commit()
+	return userID, tx.Commit()
 }
 
 func (pg *PgStorage) FindUser(login string) (int, string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), _databaseRequestTimeout)
 	defer cancel()
 
-	var userId int
+	var userID int
 	var userPassword string
-	err := pg.db.QueryRowContext(ctx, _sqlFindUser, login).Scan(&userId, &userPassword)
+	err := pg.db.QueryRowContext(ctx, _sqlFindUser, login).Scan(&userID, &userPassword)
 	switch {
 	case err == sql.ErrNoRows:
 		return 0, "", ErrUserNotFound
@@ -102,14 +102,14 @@ func (pg *PgStorage) FindUser(login string) (int, string, error) {
 		return 0, "", err
 	}
 
-	return userId, userPassword, nil
+	return userID, userPassword, nil
 }
 
-func (pg *PgStorage) AddOrder(userId int, orderNum string) error {
+func (pg *PgStorage) AddOrder(userID int, orderNum string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), _databaseRequestTimeout)
 	defer cancel()
 
-	foundUserOrder, err := pg.findUserOrder(userId, orderNum)
+	foundUserOrder, err := pg.findUserOrder(userID, orderNum)
 	if err != nil {
 		return err
 	}
@@ -118,7 +118,7 @@ func (pg *PgStorage) AddOrder(userId int, orderNum string) error {
 		return ErrOrderAlreadyExistsFromUser
 	}
 
-	_, err = pg.db.ExecContext(ctx, _sqlAddOrder, orderNum, userId)
+	_, err = pg.db.ExecContext(ctx, _sqlAddOrder, orderNum, userID)
 	if err != nil {
 		pqErr := err.(*pq.Error)
 		if pqErr.Message == _orderKeyConstraint {
@@ -130,11 +130,11 @@ func (pg *PgStorage) AddOrder(userId int, orderNum string) error {
 	return nil
 }
 
-func (pg *PgStorage) ListOrders(userId int) ([]OrderItem, error) {
+func (pg *PgStorage) ListOrders(userID int) ([]OrderItem, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), _databaseRequestTimeout)
 	defer cancel()
 
-	rows, err := pg.db.QueryContext(ctx, _sqlListOrders, userId)
+	rows, err := pg.db.QueryContext(ctx, _sqlListOrders, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -155,7 +155,7 @@ func (pg *PgStorage) ListOrders(userId int) ([]OrderItem, error) {
 			UploadedAt: r.uploadedAt,
 		}
 		if r.accrual.Valid {
-			item.Accrual = &r.accrual.Int32
+			item.Accrual = &r.accrual.Float64
 		}
 
 		items = append(items, item)
@@ -172,12 +172,84 @@ func (pg *PgStorage) ListOrders(userId int) ([]OrderItem, error) {
 	return items, nil
 }
 
-func (pg *PgStorage) GetBalance(userId int) (*Balance, error) {
+func (pg *PgStorage) GetOrdersToProcess() ([]OrderItem, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), _databaseRequestTimeout)
+	defer cancel()
+
+	rows, err := pg.db.QueryContext(ctx, _sqlListOrdersForProcessing)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var items []OrderItem
+
+	for rows.Next() {
+		var r orderItemRow
+		err = rows.Scan(&r.number, &r.userID)
+		if err != nil {
+			return nil, err
+		}
+
+		items = append(items, OrderItem{Number: r.number, UserID: r.userID})
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return items, nil
+}
+
+func (pg *PgStorage) ProcessOrder(orderNum string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), _databaseRequestTimeout)
+	defer cancel()
+
+	_, err := pg.db.ExecContext(ctx, _sqlUpdateOrderForProcessing, orderNum)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (pg *PgStorage) FinishOrder(orderNum string, userID int, success bool, accrual float64) error {
+	ctx, cancel := context.WithTimeout(context.Background(), _databaseRequestTimeout)
+	defer cancel()
+
+	tx, err := pg.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	if !success {
+		_, err = tx.ExecContext(ctx, _sqlUpdateOrderForInvalid, orderNum)
+		if err != nil {
+			return err
+		}
+		return tx.Commit()
+	}
+
+	_, err = tx.ExecContext(ctx, _sqlUpdateOrderForProcessed, orderNum, accrual)
+	if err != nil {
+		return err
+	}
+
+	_, err = tx.ExecContext(ctx, _sqlUpdateUserBalance, userID, accrual, 0)
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit()
+}
+
+func (pg *PgStorage) GetBalance(userID int) (*Balance, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), _databaseRequestTimeout)
 	defer cancel()
 
 	var balance Balance
-	err := pg.db.QueryRowContext(ctx, _sqlGetUserBalance, userId).Scan(&balance.Current, &balance.Withdrawn)
+	err := pg.db.QueryRowContext(ctx, _sqlGetUserBalance, userID).Scan(&balance.Current, &balance.Withdrawn)
 	if err != nil {
 		return nil, err
 	}
@@ -185,11 +257,11 @@ func (pg *PgStorage) GetBalance(userId int) (*Balance, error) {
 	return &balance, nil
 }
 
-func (pg *PgStorage) ListWithdrawals(userId int) ([]WithdrawalItem, error) {
+func (pg *PgStorage) ListWithdrawals(userID int) ([]WithdrawalItem, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), _databaseRequestTimeout)
 	defer cancel()
 
-	rows, err := pg.db.QueryContext(ctx, _sqlListWithdrawals, userId)
+	rows, err := pg.db.QueryContext(ctx, _sqlListWithdrawals, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -218,7 +290,7 @@ func (pg *PgStorage) ListWithdrawals(userId int) ([]WithdrawalItem, error) {
 	return items, nil
 }
 
-func (pg *PgStorage) BalanceWithdraw(userId int, orderNum string, sum float64) error {
+func (pg *PgStorage) BalanceWithdraw(userID int, orderNum string, sum float64) error {
 	ctx, cancel := context.WithTimeout(context.Background(), _databaseRequestTimeout)
 	defer cancel()
 
@@ -229,7 +301,7 @@ func (pg *PgStorage) BalanceWithdraw(userId int, orderNum string, sum float64) e
 	defer tx.Rollback()
 
 	// Update balance
-	_, err = tx.ExecContext(ctx, _sqlUpdateUserBalance, userId, sum)
+	_, err = tx.ExecContext(ctx, _sqlUpdateUserBalance, userID, -sum, sum)
 	if err != nil {
 		pqErr := err.(*pq.Error)
 		if pqErr.Message == _balanceSumConstraint {
@@ -239,7 +311,7 @@ func (pg *PgStorage) BalanceWithdraw(userId int, orderNum string, sum float64) e
 	}
 
 	// Insert withdrawal record
-	_, err = tx.ExecContext(ctx, _sqlAddWithdrawal, userId, orderNum, sum)
+	_, err = tx.ExecContext(ctx, _sqlAddWithdrawal, userID, orderNum, sum)
 	if err != nil {
 		return err
 	}
@@ -247,12 +319,12 @@ func (pg *PgStorage) BalanceWithdraw(userId int, orderNum string, sum float64) e
 	return tx.Commit()
 }
 
-func (pg *PgStorage) findUserOrder(userId int, orderNum string) (bool, error) {
+func (pg *PgStorage) findUserOrder(userID int, orderNum string) (bool, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), _databaseRequestTimeout)
 	defer cancel()
 
 	var dummy int
-	err := pg.db.QueryRowContext(ctx, _sqlFindUserOrder, orderNum, userId).Scan(&dummy)
+	err := pg.db.QueryRowContext(ctx, _sqlFindUserOrder, orderNum, userID).Scan(&dummy)
 	switch {
 	case err == sql.ErrNoRows:
 		return false, nil

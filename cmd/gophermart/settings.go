@@ -14,7 +14,7 @@ const (
 	_defaultLogLevel             = "DEBUG"
 	_defaultRunAddress           = "127.0.0.1:8080"
 	_defaultDatabaseDsn          = ""
-	_defaultAccrualSystemAddress = "127.0.0.1:9090"
+	_defaultAccrualSystemAddress = "http://127.0.0.1:9090"
 	_defaultSessionSecret        = "secret"
 	_defaultShutdownTimeout      = 10 * time.Second
 )
@@ -87,7 +87,7 @@ func ServiceSettingsAdapt(config *Config) (*gophermart.ServiceSettings, error) {
 	serviceSettings, err := gophermart.NewServiceSettings(
 		"http://"+config.RunAddress,
 		config.DatabaseDsn,
-		"http://"+config.AccrualSystemAddress,
+		config.AccrualSystemAddress,
 		config.SessionSecret,
 		config.ShutdownTimeout,
 	)

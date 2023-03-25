@@ -28,19 +28,19 @@ func AuthRequired(c *gin.Context) {
 	c.Next()
 }
 
-func SetUserId(c *gin.Context, userId int) error {
+func SetUserID(c *gin.Context, userID int) error {
 	session := sessions.Default(c)
-	session.Set(_userSessionKey, userId)
+	session.Set(_userSessionKey, userID)
 	return session.Save()
 }
 
-func GetUserId(c *gin.Context) int {
+func GetUserID(c *gin.Context) int {
 	val := sessions.Default(c).Get(_userSessionKey)
-	userId, _ := val.(int)
-	return userId
+	userID, _ := val.(int)
+	return userID
 }
 
-func DelUserId(c *gin.Context) error {
+func DelUserID(c *gin.Context) error {
 	session := sessions.Default(c)
 	val := session.Get(_userSessionKey)
 	if val == nil {

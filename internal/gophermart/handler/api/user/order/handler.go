@@ -2,7 +2,7 @@ package order
 
 import (
 	"errors"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"time"
 
@@ -23,7 +23,7 @@ const (
 type OrderItemsResponse struct {
 	Number     string    `json:"number"`
 	Status     string    `json:"status"`
-	Accrual    *int32    `json:"accrual,omitempty"`
+	Accrual    *float64  `json:"accrual,omitempty"`
 	UploadedAt time.Time `json:"uploaded_at"`
 }
 
@@ -42,7 +42,7 @@ func (oh *OrderHandler) AddOrder(c *gin.Context) {
 		return
 	}
 
-	orderNumBytes, err := ioutil.ReadAll(c.Request.Body)
+	orderNumBytes, err := io.ReadAll(c.Request.Body)
 	if err != nil {
 		_http.CreateStatusResponse(c, http.StatusBadRequest)
 		return
@@ -54,7 +54,7 @@ func (oh *OrderHandler) AddOrder(c *gin.Context) {
 		return
 	}
 
-	err = oh.stg.AddOrder(auth.GetUserId(c), orderNum)
+	err = oh.stg.AddOrder(auth.GetUserID(c), orderNum)
 	if err != nil {
 		if errors.Is(storage.ErrOrderAlreadyExists, err) {
 			c.String(http.StatusConflict, _orderAlreadyExists)
@@ -74,7 +74,7 @@ func (oh *OrderHandler) AddOrder(c *gin.Context) {
 }
 
 func (oh *OrderHandler) ListOrders(c *gin.Context) {
-	dbItems, err := oh.stg.ListOrders(auth.GetUserId(c))
+	dbItems, err := oh.stg.ListOrders(auth.GetUserID(c))
 	if err != nil {
 		if errors.Is(storage.ErrNoOrders, err) {
 			_http.CreateStatusResponse(c, http.StatusNoContent)

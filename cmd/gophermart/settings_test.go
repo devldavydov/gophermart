@@ -29,7 +29,7 @@ func TestServiceSettingsAdaptDefault(t *testing.T) {
 func TestServiceSettingsAdaptCustomEnv(t *testing.T) {
 	t.Setenv("RUN_ADDRESS", "1.1.1.1:9999")
 	t.Setenv("DATABASE_URI", "postgre:1234")
-	t.Setenv("ACCRUAL_SYSTEM_ADDRESS", "2.2.2.2:9999")
+	t.Setenv("ACCRUAL_SYSTEM_ADDRESS", "http://2.2.2.2:9999")
 	t.Setenv("SESSION_SECRET", "foobar")
 	t.Setenv("SHUTDOWN_TIMEOUT", "5s")
 
@@ -53,7 +53,7 @@ func TestServiceSettingsAdaptCustomFlag(t *testing.T) {
 	testFlagSet := flag.NewFlagSet("test", flag.ExitOnError)
 	config, err := LoadConfig(
 		*testFlagSet,
-		[]string{"-a", "1.1.1.1:9999", "-d", "postgre:1234", "-r", "2.2.2.2:9999", "-t", "5s", "-s", "foobar"})
+		[]string{"-a", "1.1.1.1:9999", "-d", "postgre:1234", "-r", "http://2.2.2.2:9999", "-t", "5s", "-s", "foobar"})
 	assert.NoError(t, err)
 
 	serviceSettings, err := ServiceSettingsAdapt(config)
@@ -71,14 +71,14 @@ func TestServiceSettingsAdaptCustomFlag(t *testing.T) {
 func TestServiceSettingsAdaptCustomEnvAndFlag(t *testing.T) {
 	t.Setenv("RUN_ADDRESS", "3.3.3.3:9999")
 	t.Setenv("DATABASE_URI", "postgre:4567")
-	t.Setenv("ACCRUAL_SYSTEM_ADDRESS", "3.3.3.3:9999")
+	t.Setenv("ACCRUAL_SYSTEM_ADDRESS", "http://3.3.3.3:9999")
 	t.Setenv("SESSION_SECRET", "fuzzbuzz")
 	t.Setenv("SHUTDOWN_TIMEOUT", "50s")
 
 	testFlagSet := flag.NewFlagSet("test", flag.ExitOnError)
 	config, err := LoadConfig(
 		*testFlagSet,
-		[]string{"-a", "1.1.1.1:9999", "-d", "postgre:1234", "-r", "2.2.2.2:9999", "-t", "5s", "-s", "foobar"})
+		[]string{"-a", "1.1.1.1:9999", "-d", "postgre:1234", "-r", "http://2.2.2.2:9999", "-t", "5s", "-s", "foobar"})
 	assert.NoError(t, err)
 
 	serviceSettings, err := ServiceSettingsAdapt(config)
@@ -95,7 +95,7 @@ func TestServiceSettingsAdaptCustomEnvAndFlag(t *testing.T) {
 
 func TestServiceSettingsAdaptCustomEnvAndFlagMix(t *testing.T) {
 	t.Setenv("RUN_ADDRESS", "3.3.3.3:9999")
-	t.Setenv("ACCRUAL_SYSTEM_ADDRESS", "3.3.3.3:9999")
+	t.Setenv("ACCRUAL_SYSTEM_ADDRESS", "http://3.3.3.3:9999")
 
 	testFlagSet := flag.NewFlagSet("test", flag.ExitOnError)
 	config, err := LoadConfig(*testFlagSet, []string{"-a", "1.1.1.1:9999", "-d", "postgre:4567"})

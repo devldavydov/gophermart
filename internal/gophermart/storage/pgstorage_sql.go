@@ -25,11 +25,12 @@ const (
 	// orders
 	_sqlCreateTableOrders = `
 	CREATE TABLE IF NOT EXISTS orders (
-        number      text                     NOT NULL,
-		user_id     int                      NOT NULL,
-		status      text                     NOT NULL DEFAULT 'NEW',
-		accrual     int,
-		uploaded_at timestamp with time zone NOT NULL DEFAULT now(),
+        number             text                     NOT NULL,
+		user_id            int                      NOT NULL,
+		status             text                     NOT NULL DEFAULT 'NEW',
+		accrual            double precision,
+		uploaded_at        timestamp with time zone NOT NULL DEFAULT now(),
+		processing_started timestamp with time zone,
 	
 		PRIMARY KEY (number),
 		FOREIGN KEY(user_id) REFERENCES users(id),
@@ -49,6 +50,26 @@ const (
 	FROM orders
 	WHERE user_id = $1
 	ORDER BY uploaded_at ASC
+	`
+	_sqlListOrdersForProcessing = `
+	SELECT number, user_id
+	FROM orders
+	WHERE status = 'NEW' OR (status = 'PROCESSING' AND now() - processing_started > INTERVAL '1 minute')
+	`
+	_sqlUpdateOrderForProcessing = `
+	UPDATE orders
+	SET status = 'PROCESSING', processing_started = now()
+	WHERE number = $1
+	`
+	_sqlUpdateOrderForInvalid = `
+	UPDATE orders
+	SET status = 'INVALID'
+	WHERE number = $1
+	`
+	_sqlUpdateOrderForProcessed = `
+	UPDATE orders
+	SET status = 'PROCESSED', accrual = $2
+	WHERE number = $1
 	`
 	// balance
 	_sqlCreateTableBalance = `
@@ -72,7 +93,7 @@ const (
 	`
 	_sqlUpdateUserBalance = `
 	UPDATE balance
-	SET current = current - $2, withdrawn = withdrawn + $2
+	SET current = current + $2, withdrawn = withdrawn + $3
 	WHERE user_id = $1
 	`
 	// withdrawals
