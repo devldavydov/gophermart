@@ -1,7 +1,6 @@
 package gophermart
 
 import (
-	"fmt"
 	"net/http/cookiejar"
 	"os"
 	"testing"
@@ -32,7 +31,6 @@ func (gs *GophermartSuite) SetupSuite() {
 }
 
 func (gs *GophermartSuite) TearDownSuite() {
-	fmt.Println("stop")
 }
 
 func TestGophermartIntegration(t *testing.T) {
