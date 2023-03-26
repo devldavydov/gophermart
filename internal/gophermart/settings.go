@@ -11,9 +11,15 @@ type ServiceSettings struct {
 	AccrualSystemAddress *url.URL
 	SessionSecret        string
 	ShutdownTimeout      time.Duration
+	AccrualThreadNum     int
+	OrderDBScanInterval  time.Duration
 }
 
-func NewServiceSettings(runAddress, databaseDsn, accrualSystemAddress string, sessionSecret string, shutdownTimeout time.Duration) (*ServiceSettings, error) {
+func NewServiceSettings(
+	runAddress, databaseDsn, accrualSystemAddress string,
+	sessionSecret string, shutdownTimeout time.Duration,
+	accrualThreadNum int, orderDBScanInterval time.Duration,
+) (*ServiceSettings, error) {
 	urlRunAddress, err := url.ParseRequestURI(runAddress)
 	if err != nil {
 		return nil, err
@@ -30,5 +36,7 @@ func NewServiceSettings(runAddress, databaseDsn, accrualSystemAddress string, se
 		AccrualSystemAddress: urlAccrualSystemAddress,
 		SessionSecret:        sessionSecret,
 		ShutdownTimeout:      shutdownTimeout,
+		AccrualThreadNum:     accrualThreadNum,
+		OrderDBScanInterval:  orderDBScanInterval,
 	}, nil
 }

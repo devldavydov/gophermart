@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"time"
 
 	"github.com/devldavydov/gophermart/internal/gophermart/auth"
 	"github.com/devldavydov/gophermart/internal/gophermart/compress"
@@ -57,9 +56,12 @@ func (s *Service) Start(ctx context.Context) error {
 	}(errChan)
 
 	// Start accrual daemon
-	threadNum := 2
-	dbScanInterval := 1 * time.Second
-	accrD := NewAccrualDaemon(s.settings.AccrualSystemAddress, stg, threadNum, dbScanInterval, s.logger)
+	accrD := NewAccrualDaemon(
+		s.settings.AccrualSystemAddress,
+		stg,
+		s.settings.AccrualThreadNum,
+		s.settings.OrderDBScanInterval,
+		s.logger)
 	accrD.Start(ctx)
 
 	select {

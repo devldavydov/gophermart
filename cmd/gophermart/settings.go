@@ -17,6 +17,8 @@ const (
 	_defaultAccrualSystemAddress = "http://127.0.0.1:9090"
 	_defaultSessionSecret        = "secret"
 	_defaultShutdownTimeout      = 10 * time.Second
+	_defaultAccrualThreadNum     = 2
+	_defaultOrderDBScanInterval  = 1 * time.Second
 )
 
 type Config struct {
@@ -26,6 +28,8 @@ type Config struct {
 	AccrualSystemAddress string
 	SessionSecret        string
 	ShutdownTimeout      time.Duration
+	AccrualThreadNum     int
+	OrderDBScanInterval  time.Duration
 }
 
 func LoadConfig(flagSet flag.FlagSet, flags []string) (*Config, error) {
@@ -39,6 +43,8 @@ func LoadConfig(flagSet flag.FlagSet, flags []string) (*Config, error) {
 	flagSet.StringVar(&config.AccrualSystemAddress, "r", _defaultAccrualSystemAddress, "accrual system address")
 	flagSet.StringVar(&config.SessionSecret, "s", _defaultSessionSecret, "session secret")
 	flagSet.DurationVar(&config.ShutdownTimeout, "t", _defaultShutdownTimeout, "shutdown timeout")
+	flagSet.IntVar(&config.AccrualThreadNum, "n", _defaultAccrualThreadNum, "accrual thread num")
+	flagSet.DurationVar(&config.OrderDBScanInterval, "o", _defaultOrderDBScanInterval, "order db scan interval")
 
 	flagSet.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage of %s:\n", os.Args[0])
@@ -80,6 +86,16 @@ func LoadConfig(flagSet flag.FlagSet, flags []string) (*Config, error) {
 		return nil, err
 	}
 
+	config.AccrualThreadNum, err = env.GetVariable("ACCRUAL_THREAD_NUM", env.CastInt, config.AccrualThreadNum)
+	if err != nil {
+		return nil, err
+	}
+
+	config.OrderDBScanInterval, err = env.GetVariable("ORDER_DB_SCAN_INTERVAL", env.CastDuration, config.OrderDBScanInterval)
+	if err != nil {
+		return nil, err
+	}
+
 	return config, nil
 }
 
@@ -90,6 +106,8 @@ func ServiceSettingsAdapt(config *Config) (*gophermart.ServiceSettings, error) {
 		config.AccrualSystemAddress,
 		config.SessionSecret,
 		config.ShutdownTimeout,
+		config.AccrualThreadNum,
+		config.OrderDBScanInterval,
 	)
 	if err != nil {
 		return nil, err
