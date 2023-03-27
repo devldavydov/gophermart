@@ -21,10 +21,13 @@ var (
 )
 
 const (
-	_databaseInitTimeout  = 10 * time.Second
-	_userUniqueConstraint = `duplicate key value violates unique constraint "users_username_key"`
-	_orderKeyConstraint   = `duplicate key value violates unique constraint "orders_pkey"`
-	_balanceSumConstraint = `new row for relation "balance" violates check constraint "balance_current_check"`
+	_databaseInitTimeout = 10 * time.Second
+
+	_constraintCheckViolation  pq.ErrorCode = "23514"
+	_constraintUniqueViolation pq.ErrorCode = "23505"
+	_constraintBalanceCheck                 = "balance_current_check"
+	_constraintUsernameCheck                = "users_username_key"
+	_constraintOrderPkeyCheck               = "orders_pkey"
 )
 
 type PgStorage struct {
@@ -70,10 +73,15 @@ func (pg *PgStorage) CreateUser(ctx context.Context, login, password string) (in
 	var userID int
 	err = tx.QueryRowContext(ctx, _sqlCreateUser, login, password).Scan(&userID)
 	if err != nil {
-		pqErr := err.(*pq.Error)
-		if pqErr.Message == _userUniqueConstraint {
+		var pqErr *pq.Error
+		if !errors.As(err, &pqErr) {
+			return 0, err
+		}
+
+		if pqErr.Code == _constraintUniqueViolation && pqErr.Constraint == _constraintUsernameCheck {
 			return 0, ErrUserAlreadyExists
 		}
+
 		return 0, err
 	}
 
@@ -111,10 +119,15 @@ func (pg *PgStorage) AddOrder(ctx context.Context, userID int, orderNum string) 
 
 	_, err = pg.db.ExecContext(ctx, _sqlAddOrder, orderNum, userID)
 	if err != nil {
-		pqErr := err.(*pq.Error)
-		if pqErr.Message == _orderKeyConstraint {
+		var pqErr *pq.Error
+		if !errors.As(err, &pqErr) {
+			return err
+		}
+
+		if pqErr.Code == _constraintUniqueViolation && pqErr.Constraint == _constraintOrderPkeyCheck {
 			return ErrOrderAlreadyExists
 		}
+
 		return err
 	}
 
@@ -273,10 +286,15 @@ func (pg *PgStorage) BalanceWithdraw(ctx context.Context, userID int, orderNum s
 	// Update balance
 	_, err = tx.ExecContext(ctx, _sqlUpdateUserBalance, userID, -sum, sum)
 	if err != nil {
-		pqErr := err.(*pq.Error)
-		if pqErr.Message == _balanceSumConstraint {
+		var pqErr *pq.Error
+		if !errors.As(err, &pqErr) {
+			return err
+		}
+
+		if pqErr.Code == _constraintCheckViolation && pqErr.Constraint == _constraintBalanceCheck {
 			return ErrNotEnoughBalance
 		}
+
 		return err
 	}
 
