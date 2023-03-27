@@ -21,10 +21,10 @@ var (
 )
 
 const (
-	_databaseRequestTimeout = 10 * time.Second
-	_userUniqueConstraint   = `duplicate key value violates unique constraint "users_username_key"`
-	_orderKeyConstraint     = `duplicate key value violates unique constraint "orders_pkey"`
-	_balanceSumConstraint   = `new row for relation "balance" violates check constraint "balance_current_check"`
+	_databaseInitTimeout  = 10 * time.Second
+	_userUniqueConstraint = `duplicate key value violates unique constraint "users_username_key"`
+	_orderKeyConstraint   = `duplicate key value violates unique constraint "orders_pkey"`
+	_balanceSumConstraint = `new row for relation "balance" violates check constraint "balance_current_check"`
 )
 
 type PgStorage struct {
@@ -60,10 +60,7 @@ func (pg *PgStorage) Close() {
 	}
 }
 
-func (pg *PgStorage) CreateUser(login, password string) (int, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), _databaseRequestTimeout)
-	defer cancel()
-
+func (pg *PgStorage) CreateUser(ctx context.Context, login, password string) (int, error) {
 	tx, err := pg.db.Begin()
 	if err != nil {
 		return 0, err
@@ -88,10 +85,7 @@ func (pg *PgStorage) CreateUser(login, password string) (int, error) {
 	return userID, tx.Commit()
 }
 
-func (pg *PgStorage) FindUser(login string) (int, string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), _databaseRequestTimeout)
-	defer cancel()
-
+func (pg *PgStorage) FindUser(ctx context.Context, login string) (int, string, error) {
 	var userID int
 	var userPassword string
 	err := pg.db.QueryRowContext(ctx, _sqlFindUser, login).Scan(&userID, &userPassword)
@@ -105,11 +99,8 @@ func (pg *PgStorage) FindUser(login string) (int, string, error) {
 	return userID, userPassword, nil
 }
 
-func (pg *PgStorage) AddOrder(userID int, orderNum string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), _databaseRequestTimeout)
-	defer cancel()
-
-	foundUserOrder, err := pg.findUserOrder(userID, orderNum)
+func (pg *PgStorage) AddOrder(ctx context.Context, userID int, orderNum string) error {
+	foundUserOrder, err := pg.findUserOrder(ctx, userID, orderNum)
 	if err != nil {
 		return err
 	}
@@ -130,10 +121,7 @@ func (pg *PgStorage) AddOrder(userID int, orderNum string) error {
 	return nil
 }
 
-func (pg *PgStorage) ListOrders(userID int) ([]OrderItem, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), _databaseRequestTimeout)
-	defer cancel()
-
+func (pg *PgStorage) ListOrders(ctx context.Context, userID int) ([]OrderItem, error) {
 	rows, err := pg.db.QueryContext(ctx, _sqlListOrders, userID)
 	if err != nil {
 		return nil, err
@@ -172,10 +160,7 @@ func (pg *PgStorage) ListOrders(userID int) ([]OrderItem, error) {
 	return items, nil
 }
 
-func (pg *PgStorage) GetOrdersToProcess() ([]OrderItem, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), _databaseRequestTimeout)
-	defer cancel()
-
+func (pg *PgStorage) GetOrdersToProcess(ctx context.Context) ([]OrderItem, error) {
 	rows, err := pg.db.QueryContext(ctx, _sqlListOrdersForProcessing)
 	if err != nil {
 		return nil, err
@@ -201,10 +186,7 @@ func (pg *PgStorage) GetOrdersToProcess() ([]OrderItem, error) {
 	return items, nil
 }
 
-func (pg *PgStorage) ProcessOrder(orderNum string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), _databaseRequestTimeout)
-	defer cancel()
-
+func (pg *PgStorage) ProcessOrder(ctx context.Context, orderNum string) error {
 	_, err := pg.db.ExecContext(ctx, _sqlUpdateOrderForProcessing, orderNum)
 	if err != nil {
 		return err
@@ -213,10 +195,7 @@ func (pg *PgStorage) ProcessOrder(orderNum string) error {
 	return nil
 }
 
-func (pg *PgStorage) FinishOrder(orderNum string, userID int, success bool, accrual float64) error {
-	ctx, cancel := context.WithTimeout(context.Background(), _databaseRequestTimeout)
-	defer cancel()
-
+func (pg *PgStorage) FinishOrder(ctx context.Context, orderNum string, userID int, success bool, accrual float64) error {
 	tx, err := pg.db.Begin()
 	if err != nil {
 		return err
@@ -244,10 +223,7 @@ func (pg *PgStorage) FinishOrder(orderNum string, userID int, success bool, accr
 	return tx.Commit()
 }
 
-func (pg *PgStorage) GetBalance(userID int) (*Balance, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), _databaseRequestTimeout)
-	defer cancel()
-
+func (pg *PgStorage) GetBalance(ctx context.Context, userID int) (*Balance, error) {
 	var balance Balance
 	err := pg.db.QueryRowContext(ctx, _sqlGetUserBalance, userID).Scan(&balance.Current, &balance.Withdrawn)
 	if err != nil {
@@ -257,10 +233,7 @@ func (pg *PgStorage) GetBalance(userID int) (*Balance, error) {
 	return &balance, nil
 }
 
-func (pg *PgStorage) ListWithdrawals(userID int) ([]WithdrawalItem, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), _databaseRequestTimeout)
-	defer cancel()
-
+func (pg *PgStorage) ListWithdrawals(ctx context.Context, userID int) ([]WithdrawalItem, error) {
 	rows, err := pg.db.QueryContext(ctx, _sqlListWithdrawals, userID)
 	if err != nil {
 		return nil, err
@@ -290,10 +263,7 @@ func (pg *PgStorage) ListWithdrawals(userID int) ([]WithdrawalItem, error) {
 	return items, nil
 }
 
-func (pg *PgStorage) BalanceWithdraw(userID int, orderNum string, sum float64) error {
-	ctx, cancel := context.WithTimeout(context.Background(), _databaseRequestTimeout)
-	defer cancel()
-
+func (pg *PgStorage) BalanceWithdraw(ctx context.Context, userID int, orderNum string, sum float64) error {
 	tx, err := pg.db.Begin()
 	if err != nil {
 		return err
@@ -319,10 +289,7 @@ func (pg *PgStorage) BalanceWithdraw(userID int, orderNum string, sum float64) e
 	return tx.Commit()
 }
 
-func (pg *PgStorage) findUserOrder(userID int, orderNum string) (bool, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), _databaseRequestTimeout)
-	defer cancel()
-
+func (pg *PgStorage) findUserOrder(ctx context.Context, userID int, orderNum string) (bool, error) {
 	var dummy int
 	err := pg.db.QueryRowContext(ctx, _sqlFindUserOrder, orderNum, userID).Scan(&dummy)
 	switch {
@@ -336,7 +303,7 @@ func (pg *PgStorage) findUserOrder(userID int, orderNum string) (bool, error) {
 }
 
 func (pg *PgStorage) init() error {
-	ctx, cancel := context.WithTimeout(context.Background(), _databaseRequestTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), _databaseInitTimeout)
 	defer cancel()
 
 	for _, createTbl := range []string{_sqlCreateTableUser, _sqlCreateTableOrders, _sqlCreateTableBalance, _sqlCreateTableWithdrawals} {

@@ -54,7 +54,7 @@ func (oh *OrderHandler) AddOrder(c *gin.Context) {
 		return
 	}
 
-	err = oh.stg.AddOrder(auth.GetUserID(c), orderNum)
+	err = oh.stg.AddOrder(c.Request.Context(), auth.GetUserID(c), orderNum)
 	if err != nil {
 		if errors.Is(storage.ErrOrderAlreadyExists, err) {
 			c.String(http.StatusConflict, _orderAlreadyExists)
@@ -74,7 +74,7 @@ func (oh *OrderHandler) AddOrder(c *gin.Context) {
 }
 
 func (oh *OrderHandler) ListOrders(c *gin.Context) {
-	dbItems, err := oh.stg.ListOrders(auth.GetUserID(c))
+	dbItems, err := oh.stg.ListOrders(c.Request.Context(), auth.GetUserID(c))
 	if err != nil {
 		if errors.Is(storage.ErrNoOrders, err) {
 			_http.CreateStatusResponse(c, http.StatusNoContent)

@@ -13,7 +13,10 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-const _httpClientTimeout = 1 * time.Second
+const (
+	_httpClientTimeout    = 1 * time.Second
+	_databaseOrderTimeout = 5 * time.Second
+)
 
 type AccrualStatus string
 
@@ -113,7 +116,10 @@ func (ad *AccrualDaemon) Start(ctx context.Context) {
 }
 
 func (ad *AccrualDaemon) getOrdersToProcess() ([]orderProcItem, error) {
-	orders, err := ad.stg.GetOrdersToProcess()
+	ctx, cancel := context.WithTimeout(context.Background(), _databaseOrderTimeout)
+	defer cancel()
+
+	orders, err := ad.stg.GetOrdersToProcess(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -142,7 +148,10 @@ func (at *accrualThread) start(ctx context.Context, orderChan chan orderProcItem
 }
 
 func (at *accrualThread) processOrder(orderNum string, userID int) error {
-	err := at.stg.ProcessOrder(orderNum)
+	ctxProcess, cancelProcess := context.WithTimeout(context.Background(), _databaseOrderTimeout)
+	defer cancelProcess()
+
+	err := at.stg.ProcessOrder(ctxProcess, orderNum)
 	if err != nil {
 		return err
 	}
@@ -171,11 +180,14 @@ func (at *accrualThread) processOrder(orderNum string, userID int) error {
 		return fmt.Errorf("failed to parse accrual response: %w", err)
 	}
 
+	ctxFinish, cancelFinish := context.WithTimeout(context.Background(), _databaseOrderTimeout)
+	defer cancelFinish()
+
 	switch accResp.Status {
 	case _accrualStatusInvalid:
-		err = at.stg.FinishOrder(orderNum, userID, false, 0)
+		err = at.stg.FinishOrder(ctxFinish, orderNum, userID, false, 0)
 	case _accrualStatusProcessed:
-		err = at.stg.FinishOrder(orderNum, userID, true, *accResp.Accrual)
+		err = at.stg.FinishOrder(ctxFinish, orderNum, userID, true, *accResp.Accrual)
 	default:
 		at.logger.Infof("[adthread #%d] order %s still in process", at.threadID, orderNum)
 	}

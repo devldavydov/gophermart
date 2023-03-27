@@ -46,7 +46,7 @@ func (lh *LoginHandler) Register(c *gin.Context) {
 		return
 	}
 
-	userID, err := lh.stg.CreateUser(req.Login, pwdHash)
+	userID, err := lh.stg.CreateUser(c.Request.Context(), req.Login, pwdHash)
 	if err != nil {
 		if errors.Is(storage.ErrUserAlreadyExists, err) {
 			c.String(http.StatusConflict, _userAlreadyExists)
@@ -73,7 +73,7 @@ func (lh *LoginHandler) Login(c *gin.Context) {
 		return
 	}
 
-	userID, pwdHash, err := lh.stg.FindUser(req.Login)
+	userID, pwdHash, err := lh.stg.FindUser(c.Request.Context(), req.Login)
 	if err != nil {
 		if errors.Is(storage.ErrUserNotFound, err) {
 			c.String(http.StatusUnauthorized, _userWrongAuth)
