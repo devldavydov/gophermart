@@ -6,7 +6,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/devldavydov/gophermart/internal/common/env"
+	"github.com/caarlos0/env/v7"
 	"github.com/devldavydov/gophermart/internal/gophermart"
 )
 
@@ -22,14 +22,14 @@ const (
 )
 
 type Config struct {
-	LogLevel             string
-	RunAddress           string
-	DatabaseDsn          string
-	AccrualSystemAddress string
-	SessionSecret        string
-	ShutdownTimeout      time.Duration
-	AccrualThreadNum     int
-	OrderDBScanInterval  time.Duration
+	LogLevel             string        `env:"LOG_LEVEL"`
+	RunAddress           string        `env:"RUN_ADDRESS"`
+	DatabaseDsn          string        `env:"DATABASE_URI"`
+	AccrualSystemAddress string        `env:"ACCRUAL_SYSTEM_ADDRESS"`
+	SessionSecret        string        `env:"SESSION_SECRET"`
+	ShutdownTimeout      time.Duration `env:"SHUTDOWN_TIMEOUT"`
+	AccrualThreadNum     int           `env:"ACCRUAL_THREAD_NUM"`
+	OrderDBScanInterval  time.Duration `env:"ORDER_DB_SCAN_INTERVAL"`
 }
 
 func LoadConfig(flagSet flag.FlagSet, flags []string) (*Config, error) {
@@ -56,43 +56,7 @@ func LoadConfig(flagSet flag.FlagSet, flags []string) (*Config, error) {
 	}
 
 	// Check env
-	config.LogLevel, err = env.GetVariable("LOG_LEVEL", env.CastString, config.LogLevel)
-	if err != nil {
-		return nil, err
-	}
-
-	config.RunAddress, err = env.GetVariable("RUN_ADDRESS", env.CastString, config.RunAddress)
-	if err != nil {
-		return nil, err
-	}
-
-	config.DatabaseDsn, err = env.GetVariable("DATABASE_URI", env.CastString, config.DatabaseDsn)
-	if err != nil {
-		return nil, err
-	}
-
-	config.AccrualSystemAddress, err = env.GetVariable("ACCRUAL_SYSTEM_ADDRESS", env.CastString, config.AccrualSystemAddress)
-	if err != nil {
-		return nil, err
-	}
-
-	config.SessionSecret, err = env.GetVariable("SESSION_SECRET", env.CastString, config.SessionSecret)
-	if err != nil {
-		return nil, err
-	}
-
-	config.ShutdownTimeout, err = env.GetVariable("SHUTDOWN_TIMEOUT", env.CastDuration, config.ShutdownTimeout)
-	if err != nil {
-		return nil, err
-	}
-
-	config.AccrualThreadNum, err = env.GetVariable("ACCRUAL_THREAD_NUM", env.CastInt, config.AccrualThreadNum)
-	if err != nil {
-		return nil, err
-	}
-
-	config.OrderDBScanInterval, err = env.GetVariable("ORDER_DB_SCAN_INTERVAL", env.CastDuration, config.OrderDBScanInterval)
-	if err != nil {
+	if err = env.Parse(config); err != nil {
 		return nil, err
 	}
 
