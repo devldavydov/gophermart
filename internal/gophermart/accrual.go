@@ -15,11 +15,13 @@ import (
 
 const _httpClientTimeout = 1 * time.Second
 
+type AccrualStatus string
+
 const (
-	_accrualStatusRegistered = "REGISTERED"
-	_accrualStatusInvalid    = "INVALID"
-	_accrualStatusProcessing = "PROCESSING"
-	_accrualStatusProcessed  = "PROCESSED"
+	_accrualStatusRegistered AccrualStatus = "REGISTERED"
+	_accrualStatusInvalid    AccrualStatus = "INVALID"
+	_accrualStatusProcessing AccrualStatus = "PROCESSING"
+	_accrualStatusProcessed  AccrualStatus = "PROCESSED"
 )
 
 type orderProcItem struct {
@@ -57,9 +59,9 @@ type accrualThread struct {
 }
 
 type accrualResponse struct {
-	Order   string   `json:"order"`
-	Status  string   `json:"status"`
-	Accrual *float64 `json:"accrual,omitempty"`
+	Order   string        `json:"order"`
+	Status  AccrualStatus `json:"status"`
+	Accrual *float64      `json:"accrual,omitempty"`
 }
 
 func newAccrualThread(accrualSystemAddress *url.URL, threadID int, stg storage.Storage, logger *logrus.Logger) *accrualThread {
@@ -170,9 +172,9 @@ func (at *accrualThread) processOrder(orderNum string, userID int) error {
 	}
 
 	switch accResp.Status {
-	case "INVALID":
+	case _accrualStatusInvalid:
 		err = at.stg.FinishOrder(orderNum, userID, false, 0)
-	case "PROCESSED":
+	case _accrualStatusProcessed:
 		err = at.stg.FinishOrder(orderNum, userID, true, *accResp.Accrual)
 	default:
 		at.logger.Infof("[adthread #%d] order %s still in process", at.threadID, orderNum)
