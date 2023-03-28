@@ -4,7 +4,6 @@ import (
 	"net/http"
 
 	"github.com/google/uuid"
-	"github.com/stretchr/testify/assert"
 )
 
 func (gs *GophermartSuite) TestApiWithoutAuth() {
@@ -20,76 +19,104 @@ func (gs *GophermartSuite) TestApiWithoutAuth() {
 		{"/api/user/orders", http.MethodGet},
 	} {
 		resp, err := gs.httpClient.R().Execute(api.method, api.url)
-		assert.NoError(gs.T(), err)
-		assert.Equal(gs.T(), http.StatusUnauthorized, resp.StatusCode())
+		gs.NoError(err)
+		gs.Equal(http.StatusUnauthorized, resp.StatusCode())
 	}
 }
 
 func (gs *GophermartSuite) TestRegisterLoginLogout() {
-	userLogin, userPassword := uuid.NewString(), uuid.NewString()
+	gs.Run("register with wrong request", func() {
+		resp, err := gs.httpClient.R().
+			SetBody("foobar").
+			Post("/api/user/register")
+		gs.NoError(err)
+		gs.Equal(http.StatusBadRequest, resp.StatusCode())
+	})
 
-	// Register with wrong request
-	resp, err := gs.httpClient.R().
-		SetBody("foobar").
-		Post("/api/user/register")
-	assert.NoError(gs.T(), err)
-	assert.Equal(gs.T(), http.StatusBadRequest, resp.StatusCode())
+	gs.Run("register successful", func() {
+		userLogin, userPassword := uuid.NewString(), uuid.NewString()
 
-	// Register
-	resp, err = gs.httpClient.R().
-		SetBody(userAuth{Login: userLogin, Password: userPassword}).
-		Post("/api/user/register")
-	assert.NoError(gs.T(), err)
-	assert.Equal(gs.T(), http.StatusOK, resp.StatusCode())
+		resp, err := gs.userRegister(userLogin, userPassword)
+		gs.NoError(err)
+		gs.Equal(http.StatusOK, resp.StatusCode())
 
-	authCookie := resp.Header().Get("Set-Cookie")
-	assert.NotEqual(gs.T(), "", authCookie)
+		authCookie := resp.Header().Get("Set-Cookie")
+		gs.NotEqual("", authCookie)
+	})
 
-	// Register same user twice
-	resp, err = gs.httpClient.R().
-		SetBody(userAuth{Login: userLogin, Password: userPassword}).
-		Post("/api/user/register")
-	assert.NoError(gs.T(), err)
-	assert.Equal(gs.T(), http.StatusConflict, resp.StatusCode())
+	gs.Run("register same user twice", func() {
+		userLogin, userPassword := uuid.NewString(), uuid.NewString()
 
-	// Try url after registered
-	resp, err = gs.httpClient.R().Get("/api/user/balance")
-	assert.NoError(gs.T(), err)
-	assert.Equal(gs.T(), http.StatusOK, resp.StatusCode())
+		resp, err := gs.userRegister(userLogin, userPassword)
+		gs.NoError(err)
+		gs.Equal(http.StatusOK, resp.StatusCode())
 
-	// Logout
-	resp, err = gs.httpClient.R().Post("/api/user/logout")
-	assert.NoError(gs.T(), err)
-	assert.Equal(gs.T(), http.StatusOK, resp.StatusCode())
+		resp, err = gs.userRegister(userLogin, userPassword)
+		gs.NoError(err)
+		gs.Equal(http.StatusConflict, resp.StatusCode())
+	})
 
-	// Try url after logout
-	resp, err = gs.httpClient.R().Get("/api/user/balance")
-	assert.NoError(gs.T(), err)
-	assert.Equal(gs.T(), http.StatusUnauthorized, resp.StatusCode())
+	gs.Run("register and check url", func() {
+		userLogin, userPassword := uuid.NewString(), uuid.NewString()
 
-	// Login with wrong request
-	resp, err = gs.httpClient.R().
-		SetBody("foobar").
-		Post("/api/user/login")
-	assert.NoError(gs.T(), err)
-	assert.Equal(gs.T(), http.StatusBadRequest, resp.StatusCode())
+		resp, err := gs.userRegister(userLogin, userPassword)
+		gs.NoError(err)
+		gs.Equal(http.StatusOK, resp.StatusCode())
 
-	// Login with wrong credentials
-	resp, err = gs.httpClient.R().
-		SetBody(userAuth{Login: "foo", Password: "bar"}).
-		Post("/api/user/login")
-	assert.NoError(gs.T(), err)
-	assert.Equal(gs.T(), http.StatusUnauthorized, resp.StatusCode())
+		resp, err = gs.httpClient.R().Get("/api/user/balance")
+		gs.NoError(err)
+		gs.Equal(http.StatusOK, resp.StatusCode())
+	})
 
-	// Login
-	resp, err = gs.httpClient.R().
-		SetBody(userAuth{Login: userLogin, Password: userPassword}).
-		Post("/api/user/login")
-	assert.NoError(gs.T(), err)
-	assert.Equal(gs.T(), http.StatusOK, resp.StatusCode())
+	gs.Run("register, logout and check url", func() {
+		userLogin, userPassword := uuid.NewString(), uuid.NewString()
 
-	// Try url after login
-	resp, err = gs.httpClient.R().Get("/api/user/balance")
-	assert.NoError(gs.T(), err)
-	assert.Equal(gs.T(), http.StatusOK, resp.StatusCode())
+		resp, err := gs.userRegister(userLogin, userPassword)
+		gs.NoError(err)
+		gs.Equal(http.StatusOK, resp.StatusCode())
+
+		resp, err = gs.httpClient.R().Post("/api/user/logout")
+		gs.NoError(err)
+		gs.Equal(http.StatusOK, resp.StatusCode())
+
+		resp, err = gs.httpClient.R().Get("/api/user/balance")
+		gs.NoError(err)
+		gs.Equal(http.StatusUnauthorized, resp.StatusCode())
+	})
+
+	gs.Run("login with wrong request", func() {
+		resp, err := gs.httpClient.R().
+			SetBody("foobar").
+			Post("/api/user/login")
+		gs.NoError(err)
+		gs.Equal(http.StatusBadRequest, resp.StatusCode())
+	})
+
+	gs.Run("register and login with wrong creds", func() {
+		userLogin, userPassword := uuid.NewString(), uuid.NewString()
+
+		resp, err := gs.userRegister(userLogin, userPassword)
+		gs.NoError(err)
+		gs.Equal(http.StatusOK, resp.StatusCode())
+
+		resp, err = gs.userLogin("foo", "bar")
+		gs.NoError(err)
+		gs.Equal(http.StatusUnauthorized, resp.StatusCode())
+	})
+
+	gs.Run("register, correct login and check url", func() {
+		userLogin, userPassword := uuid.NewString(), uuid.NewString()
+
+		resp, err := gs.userRegister(userLogin, userPassword)
+		gs.NoError(err)
+		gs.Equal(http.StatusOK, resp.StatusCode())
+
+		resp, err = gs.userLogin(userLogin, userPassword)
+		gs.NoError(err)
+		gs.Equal(http.StatusOK, resp.StatusCode())
+
+		resp, err = gs.httpClient.R().Get("/api/user/balance")
+		gs.NoError(err)
+		gs.Equal(http.StatusOK, resp.StatusCode())
+	})
 }
