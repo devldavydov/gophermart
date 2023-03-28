@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/devldavydov/gophermart/pkg/gophermart"
 	"github.com/go-resty/resty/v2"
 	"github.com/stretchr/testify/suite"
 )
@@ -19,6 +20,7 @@ type GophermartSuite struct {
 	suite.Suite
 
 	httpClient           *resty.Client
+	gCli                 *gophermart.Client
 	accrualSrvListenAddr string
 	waitTimeout          time.Duration
 	waitTick             time.Duration
@@ -29,6 +31,8 @@ func (gs *GophermartSuite) SetupSuite() {
 	gs.httpClient = resty.New().
 		SetBaseURL(os.Getenv(_envGophermartSrvAddr)).
 		SetCookieJar(jar)
+
+	gs.gCli = gophermart.NewClient(os.Getenv(_envGophermartSrvAddr))
 
 	gs.accrualSrvListenAddr = os.Getenv(_envAccrualSrvListenAddr)
 	gs.waitTimeout = 10 * time.Second

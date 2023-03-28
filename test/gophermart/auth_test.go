@@ -3,6 +3,7 @@ package gophermart
 import (
 	"net/http"
 
+	"github.com/devldavydov/gophermart/pkg/gophermart"
 	"github.com/google/uuid"
 )
 
@@ -34,35 +35,29 @@ func (gs *GophermartSuite) TestRegisterLoginLogout() {
 	})
 
 	gs.Run("register successful", func() {
-		userLogin, userPassword := uuid.NewString(), uuid.NewString()
-
-		resp := gs.userRegister(userLogin, userPassword, http.StatusOK)
-
-		authCookie := resp.Header().Get("Set-Cookie")
-		gs.NotEqual("", authCookie)
+		gs.NoError(gs.gCli.UserRegister(uuid.NewString(), uuid.NewString()))
 	})
 
 	gs.Run("register same user twice", func() {
 		userLogin, userPassword := uuid.NewString(), uuid.NewString()
 
-		gs.userRegister(userLogin, userPassword, http.StatusOK)
-		gs.userRegister(userLogin, userPassword, http.StatusConflict)
+		gs.NoError(gs.gCli.UserRegister(userLogin, userPassword))
+		gs.ErrorIs(gophermart.ErrUserAlreadyExists, gs.gCli.UserRegister(userLogin, userPassword))
 	})
 
 	gs.Run("register and check url", func() {
-		userLogin, userPassword := uuid.NewString(), uuid.NewString()
+		gs.NoError(gs.gCli.UserRegister(uuid.NewString(), uuid.NewString()))
 
-		gs.userRegister(userLogin, userPassword, http.StatusOK)
-		gs.userGetBalance(http.StatusOK)
+		_, err := gs.gCli.GetBalance()
+		gs.NoError(err)
 	})
 
 	gs.Run("register, logout and check url", func() {
-		userLogin, userPassword := uuid.NewString(), uuid.NewString()
+		gs.NoError(gs.gCli.UserRegister(uuid.NewString(), uuid.NewString()))
+		gs.NoError(gs.gCli.UserLogout())
 
-		gs.userRegister(userLogin, userPassword, http.StatusOK)
-		gs.userLogout()
-
-		gs.userGetBalance(http.StatusUnauthorized)
+		_, err := gs.gCli.GetBalance()
+		gs.ErrorIs(gophermart.ErrUnauthorized, err)
 	})
 
 	gs.Run("login with wrong request", func() {
@@ -74,19 +69,18 @@ func (gs *GophermartSuite) TestRegisterLoginLogout() {
 	})
 
 	gs.Run("register and login with wrong creds", func() {
-		userLogin, userPassword := uuid.NewString(), uuid.NewString()
-
-		gs.userRegister(userLogin, userPassword, http.StatusOK)
-		gs.userLogin("foo", "bar", http.StatusUnauthorized)
+		gs.NoError(gs.gCli.UserRegister(uuid.NewString(), uuid.NewString()))
+		gs.ErrorIs(gophermart.ErrUnauthorized, gs.gCli.UserLogin("foo", "bar"))
 	})
 
 	gs.Run("register, logout, correct login and check url", func() {
 		userLogin, userPassword := uuid.NewString(), uuid.NewString()
 
-		gs.userRegister(userLogin, userPassword, http.StatusOK)
-		gs.userLogout()
-		gs.userLogin(userLogin, userPassword, http.StatusOK)
+		gs.NoError(gs.gCli.UserRegister(userLogin, userPassword))
+		gs.NoError(gs.gCli.UserLogout())
+		gs.NoError(gs.gCli.UserLogin(userLogin, userPassword))
 
-		gs.userGetBalance(http.StatusOK)
+		_, err := gs.gCli.GetBalance()
+		gs.NoError(err)
 	})
 }
