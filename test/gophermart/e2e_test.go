@@ -11,9 +11,37 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func (gs *GophermartSuite) TestE2E() {
+func (gs *GophermartSuite) TestE2EOrderInvalid() {
 	userLogin, userPassword := uuid.NewString(), uuid.NewString()
+	gs.userRegister(userLogin, userPassword, http.StatusOK)
 
+	orderNum := goluhn.Generate(10)
+
+	var wg sync.WaitGroup
+	cancel := gs.startAccrualMock(&wg, AccrualMockResp{orderNum: {"order": orderNum, "status": "INVALID"}})
+
+	gs.Run("add order", func() {
+		gs.userAddOrder(orderNum, http.StatusAccepted)
+	})
+
+	gs.Eventually(
+		func() bool {
+			return gs.Run("wait order status changed", func() {
+				lst := gs.userGetOrders(http.StatusOK)
+				gs.Equal(1, len(lst))
+				gs.Equal("INVALID", lst[0].Status)
+				gs.Equal(orderNum, lst[0].Number)
+			})
+		},
+		gs.waitTimeout, gs.waitTick,
+	)
+
+	cancel()
+	wg.Wait()
+}
+
+func (gs *GophermartSuite) fTestE2E() {
+	userLogin, userPassword := uuid.NewString(), uuid.NewString()
 	orderNum1 := goluhn.Generate(10)
 	orderNum2 := goluhn.Generate(10)
 	orderNum3 := goluhn.Generate(10)

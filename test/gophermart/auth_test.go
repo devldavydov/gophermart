@@ -36,9 +36,7 @@ func (gs *GophermartSuite) TestRegisterLoginLogout() {
 	gs.Run("register successful", func() {
 		userLogin, userPassword := uuid.NewString(), uuid.NewString()
 
-		resp, err := gs.userRegister(userLogin, userPassword)
-		gs.NoError(err)
-		gs.Equal(http.StatusOK, resp.StatusCode())
+		resp := gs.userRegister(userLogin, userPassword, http.StatusOK)
 
 		authCookie := resp.Header().Get("Set-Cookie")
 		gs.NotEqual("", authCookie)
@@ -47,41 +45,24 @@ func (gs *GophermartSuite) TestRegisterLoginLogout() {
 	gs.Run("register same user twice", func() {
 		userLogin, userPassword := uuid.NewString(), uuid.NewString()
 
-		resp, err := gs.userRegister(userLogin, userPassword)
-		gs.NoError(err)
-		gs.Equal(http.StatusOK, resp.StatusCode())
-
-		resp, err = gs.userRegister(userLogin, userPassword)
-		gs.NoError(err)
-		gs.Equal(http.StatusConflict, resp.StatusCode())
+		gs.userRegister(userLogin, userPassword, http.StatusOK)
+		gs.userRegister(userLogin, userPassword, http.StatusConflict)
 	})
 
 	gs.Run("register and check url", func() {
 		userLogin, userPassword := uuid.NewString(), uuid.NewString()
 
-		resp, err := gs.userRegister(userLogin, userPassword)
-		gs.NoError(err)
-		gs.Equal(http.StatusOK, resp.StatusCode())
-
-		resp, err = gs.httpClient.R().Get("/api/user/balance")
-		gs.NoError(err)
-		gs.Equal(http.StatusOK, resp.StatusCode())
+		gs.userRegister(userLogin, userPassword, http.StatusOK)
+		gs.userGetBalance(http.StatusOK)
 	})
 
 	gs.Run("register, logout and check url", func() {
 		userLogin, userPassword := uuid.NewString(), uuid.NewString()
 
-		resp, err := gs.userRegister(userLogin, userPassword)
-		gs.NoError(err)
-		gs.Equal(http.StatusOK, resp.StatusCode())
+		gs.userRegister(userLogin, userPassword, http.StatusOK)
+		gs.userLogout()
 
-		resp, err = gs.httpClient.R().Post("/api/user/logout")
-		gs.NoError(err)
-		gs.Equal(http.StatusOK, resp.StatusCode())
-
-		resp, err = gs.httpClient.R().Get("/api/user/balance")
-		gs.NoError(err)
-		gs.Equal(http.StatusUnauthorized, resp.StatusCode())
+		gs.userGetBalance(http.StatusUnauthorized)
 	})
 
 	gs.Run("login with wrong request", func() {
@@ -95,28 +76,17 @@ func (gs *GophermartSuite) TestRegisterLoginLogout() {
 	gs.Run("register and login with wrong creds", func() {
 		userLogin, userPassword := uuid.NewString(), uuid.NewString()
 
-		resp, err := gs.userRegister(userLogin, userPassword)
-		gs.NoError(err)
-		gs.Equal(http.StatusOK, resp.StatusCode())
-
-		resp, err = gs.userLogin("foo", "bar")
-		gs.NoError(err)
-		gs.Equal(http.StatusUnauthorized, resp.StatusCode())
+		gs.userRegister(userLogin, userPassword, http.StatusOK)
+		gs.userLogin("foo", "bar", http.StatusUnauthorized)
 	})
 
-	gs.Run("register, correct login and check url", func() {
+	gs.Run("register, logout, correct login and check url", func() {
 		userLogin, userPassword := uuid.NewString(), uuid.NewString()
 
-		resp, err := gs.userRegister(userLogin, userPassword)
-		gs.NoError(err)
-		gs.Equal(http.StatusOK, resp.StatusCode())
+		gs.userRegister(userLogin, userPassword, http.StatusOK)
+		gs.userLogout()
+		gs.userLogin(userLogin, userPassword, http.StatusOK)
 
-		resp, err = gs.userLogin(userLogin, userPassword)
-		gs.NoError(err)
-		gs.Equal(http.StatusOK, resp.StatusCode())
-
-		resp, err = gs.httpClient.R().Get("/api/user/balance")
-		gs.NoError(err)
-		gs.Equal(http.StatusOK, resp.StatusCode())
+		gs.userGetBalance(http.StatusOK)
 	})
 }

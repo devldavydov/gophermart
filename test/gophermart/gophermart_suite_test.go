@@ -4,6 +4,7 @@ import (
 	"net/http/cookiejar"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/go-resty/resty/v2"
 	"github.com/stretchr/testify/suite"
@@ -19,6 +20,8 @@ type GophermartSuite struct {
 
 	httpClient           *resty.Client
 	accrualSrvListenAddr string
+	waitTimeout          time.Duration
+	waitTick             time.Duration
 }
 
 func (gs *GophermartSuite) SetupSuite() {
@@ -28,6 +31,8 @@ func (gs *GophermartSuite) SetupSuite() {
 		SetCookieJar(jar)
 
 	gs.accrualSrvListenAddr = os.Getenv(_envAccrualSrvListenAddr)
+	gs.waitTimeout = 10 * time.Second
+	gs.waitTick = 1 * time.Second
 }
 
 func (gs *GophermartSuite) TearDownSuite() {
