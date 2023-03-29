@@ -1,24 +1,15 @@
 package gophermart
 
 import (
-	"context"
-	"net/http"
-	"sync"
-	"time"
-
 	"github.com/ShiraazMoollatjie/goluhn"
 	"github.com/google/uuid"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func (gs *GophermartSuite) TestE2EOrderInvalid() {
 	require.NoError(gs.T(), gs.gCli.UserRegister(uuid.NewString(), uuid.NewString()))
-
 	orderNum := goluhn.Generate(10)
-
-	var wg sync.WaitGroup
-	cancel := gs.startAccrualMock(&wg, AccrualMockResp{orderNum: {"order": orderNum, "status": "INVALID"}})
+	gs.accrualMock.SetRespMap(AccrualMockResp{orderNum: {"order": orderNum, "status": "INVALID"}})
 
 	gs.Run("add order", func() {
 		gs.NoError(gs.gCli.AddOrder(orderNum))
@@ -31,155 +22,139 @@ func (gs *GophermartSuite) TestE2EOrderInvalid() {
 				return false
 			}
 
-			return len(lst) == 1 && lst[0].Status == "INVALID" && lst[0].Number == orderNum
+			return len(lst) == 1 &&
+				lst[0].Status == "INVALID" &&
+				lst[0].Number == orderNum &&
+				lst[0].Accrual == nil
+		}, gs.waitTimeout, gs.waitTick)
+	})
+}
+
+func (gs *GophermartSuite) TestE2EOrderProcessed() {
+	require.NoError(gs.T(), gs.gCli.UserRegister(uuid.NewString(), uuid.NewString()))
+	orderNum := goluhn.Generate(10)
+	gs.accrualMock.SetRespMap(AccrualMockResp{orderNum: {"order": orderNum, "status": "PROCESSED", "accrual": 100}})
+
+	gs.Run("add order", func() {
+		gs.NoError(gs.gCli.AddOrder(orderNum))
+	})
+
+	gs.Run("wait order status changed", func() {
+		gs.Eventually(func() bool {
+			lst, err := gs.gCli.GetOrders()
+			if err != nil {
+				return false
+			}
+
+			return len(lst) == 1 &&
+				lst[0].Status == "PROCESSED" &&
+				lst[0].Number == orderNum &&
+				lst[0].Accrual != nil &&
+				*lst[0].Accrual == 100
+		}, gs.waitTimeout, gs.waitTick)
+	})
+}
+
+func (gs *GophermartSuite) TestE2ECheckBalance() {
+	require.NoError(gs.T(), gs.gCli.UserRegister(uuid.NewString(), uuid.NewString()))
+	orderNum := goluhn.Generate(10)
+	gs.accrualMock.SetRespMap(AccrualMockResp{orderNum: {"order": orderNum, "status": "PROCESSED", "accrual": 100}})
+
+	gs.Run("check initial balance", func() {
+		blnc, err := gs.gCli.GetBalance()
+		gs.NoError(err)
+		gs.Equal(float64(0), blnc.Current)
+		gs.Equal(float64(0), blnc.Withdrawn)
+	})
+
+	gs.Run("add order", func() {
+		gs.NoError(gs.gCli.AddOrder(orderNum))
+	})
+
+	gs.Run("wait balance changed", func() {
+		gs.Eventually(func() bool {
+			blnc, err := gs.gCli.GetBalance()
+			if err != nil {
+				return false
+			}
+
+			return blnc.Current == float64(100) &&
+				blnc.Withdrawn == float64(0)
+		}, gs.waitTimeout, gs.waitTick)
+	})
+}
+
+func (gs *GophermartSuite) TestE2ECheckWithdrawals() {
+	require.NoError(gs.T(), gs.gCli.UserRegister(uuid.NewString(), uuid.NewString()))
+	orderNum1, orderNum2, orderWdraw := goluhn.Generate(10), goluhn.Generate(10), goluhn.Generate(10)
+	gs.accrualMock.SetRespMap(AccrualMockResp{
+		orderNum1: {"order": orderNum1, "status": "PROCESSED", "accrual": 100},
+		orderNum2: {"order": orderNum2, "status": "PROCESSED", "accrual": 100},
+	})
+
+	gs.Run("add orders", func() {
+		gs.NoError(gs.gCli.AddOrder(orderNum1))
+		gs.NoError(gs.gCli.AddOrder(orderNum2))
+	})
+
+	gs.Run("wait balance changed", func() {
+		gs.Eventually(func() bool {
+			blnc, err := gs.gCli.GetBalance()
+			if err != nil {
+				return false
+			}
+
+			return blnc.Current == float64(200) &&
+				blnc.Withdrawn == float64(0)
 		}, gs.waitTimeout, gs.waitTick)
 	})
 
-	cancel()
-	wg.Wait()
+	gs.Run("balance withdraw", func() {
+		gs.gCli.BalanceWithdraw(orderWdraw, 100.1)
+	})
+
+	gs.Run("check changed balance", func() {
+		blnc, err := gs.gCli.GetBalance()
+		gs.NoError(err)
+		gs.Equal(float64(99.9), blnc.Current)
+		gs.Equal(float64(100.1), blnc.Withdrawn)
+	})
+
+	gs.Run("check withdrawals", func() {
+		lst, err := gs.gCli.GetBalanceWithdrawals()
+		gs.NoError(err)
+		gs.Equal(1, len(lst))
+
+		gs.Equal(orderWdraw, lst[0].Order)
+		gs.Equal(float64(100.1), lst[0].Sum)
+	})
 }
 
-func (gs *GophermartSuite) fTestE2E() {
-	userLogin, userPassword := uuid.NewString(), uuid.NewString()
-	orderNum1 := goluhn.Generate(10)
-	orderNum2 := goluhn.Generate(10)
-	orderNum3 := goluhn.Generate(10)
-	orderNum4 := goluhn.Generate(10)
-	orderNum5 := goluhn.Generate(10)
+func (gs *GophermartSuite) TestE2ECheckBalanceWithFailedOrders() {
+	require.NoError(gs.T(), gs.gCli.UserRegister(uuid.NewString(), uuid.NewString()))
+	orders := []string{goluhn.Generate(10), goluhn.Generate(10), goluhn.Generate(10), goluhn.Generate(10), goluhn.Generate(10)}
+	gs.accrualMock.SetRespMap(AccrualMockResp{
+		orders[0]: {"order": orders[0], "status": "PROCESSED", "accrual": 100},
+		orders[1]: {"order": orders[1], "status": "INVALID"},
+		orders[2]: {"order": orders[2], "status": "PROCESSING"},
+		orders[3]: {"order": orders[3], "status": "REGISTERED"},
+	})
 
-	// Prepare accrual response map
-	var wg sync.WaitGroup
-	ctx, cancel := context.WithCancel(context.Background())
-
-	respMap := AccrualMockResp{
-		orderNum1: {
-			"order":  orderNum1,
-			"status": "REGISTERED",
-		},
-		orderNum2: {
-			"order":  orderNum2,
-			"status": "INVALID",
-		},
-		orderNum3: {
-			"order":  orderNum3,
-			"status": "PROCESSING",
-		},
-		orderNum4: {
-			"order":   orderNum4,
-			"status":  "PROCESSED",
-			"accrual": 100.5,
-		},
-		orderNum5: {
-			"order":   orderNum5,
-			"status":  "PROCESSED",
-			"accrual": 100.55,
-		},
-	}
-
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		NewAccrualMock(respMap, gs.accrualSrvListenAddr).Start(ctx)
-	}()
-
-	// Register user
-	resp, err := gs.httpClient.R().
-		SetBody(userAuth{Login: userLogin, Password: userPassword}).
-		Post("/api/user/register")
-	assert.NoError(gs.T(), err)
-	assert.Equal(gs.T(), http.StatusOK, resp.StatusCode())
-
-	// Get balance
-	var blnc userBalance
-	resp, err = gs.httpClient.R().
-		SetResult(&blnc).
-		Get("/api/user/balance")
-	assert.NoError(gs.T(), err)
-	assert.Equal(gs.T(), http.StatusOK, resp.StatusCode())
-	assert.Equal(gs.T(), float64(0), blnc.Current)
-	assert.Equal(gs.T(), float64(0), blnc.Withdrawn)
-
-	// Add orders
-	for _, order := range []string{orderNum1, orderNum2, orderNum3, orderNum4, orderNum5} {
-		resp, err = gs.httpClient.R().
-			SetBody(order).
-			SetHeader("Content-Type", "text/plain").
-			Post("/api/user/orders")
-		assert.NoError(gs.T(), err)
-		assert.Equal(gs.T(), http.StatusAccepted, resp.StatusCode())
-	}
-
-	// Wait for balance computation
-	waitDuration := 2 * time.Minute
-	startTime := time.Now()
-	success := false
-	for time.Since(startTime) < waitDuration {
-		resp, err = gs.httpClient.R().
-			SetResult(&blnc).
-			Get("/api/user/balance")
-
-		if err == nil &&
-			resp.StatusCode() == http.StatusOK &&
-			float64(201.05) == blnc.Current {
-			success = true
-			break
+	gs.Run("add orders", func() {
+		for _, order := range orders {
+			gs.NoError(gs.gCli.AddOrder(order))
 		}
+	})
 
-		time.Sleep(1 * time.Second)
-	}
-	assert.True(gs.T(), success)
+	gs.Run("wait balance changed", func() {
+		gs.Eventually(func() bool {
+			blnc, err := gs.gCli.GetBalance()
+			if err != nil {
+				return false
+			}
 
-	// Get orders
-	var lst orderList
-	resp, err = gs.httpClient.R().
-		SetResult(&lst).
-		Get("/api/user/orders")
-	assert.NoError(gs.T(), err)
-	assert.Equal(gs.T(), http.StatusOK, resp.StatusCode())
-	assert.Equal(gs.T(), 5, len(lst))
-
-	for _, item := range lst {
-		switch item.Number {
-		case orderNum2:
-			assert.Equal(gs.T(), "INVALID", item.Status)
-		case orderNum4:
-			assert.Equal(gs.T(), "PROCESSED", item.Status)
-			assert.Equal(gs.T(), 100.5, *item.Accrual)
-		case orderNum5:
-			assert.Equal(gs.T(), "PROCESSED", item.Status)
-			assert.Equal(gs.T(), 100.55, *item.Accrual)
-		}
-	}
-
-	// Balance withdraw
-	orderWithdraw := goluhn.Generate(10)
-	resp, err = gs.httpClient.R().
-		SetBody(userBalanceWithdraw{Order: orderWithdraw, Sum: 101.04}).
-		Post("/api/user/balance/withdraw")
-	assert.NoError(gs.T(), err)
-	assert.Equal(gs.T(), http.StatusOK, resp.StatusCode())
-
-	// Check new balance
-	resp, err = gs.httpClient.R().
-		SetResult(&blnc).
-		Get("/api/user/balance")
-	assert.NoError(gs.T(), err)
-	assert.Equal(gs.T(), http.StatusOK, resp.StatusCode())
-	assert.Equal(gs.T(), float64(100.01), blnc.Current)
-	assert.Equal(gs.T(), float64(101.04), blnc.Withdrawn)
-
-	// Get withdrawals
-	var wthdrwls userBalanceWithdrawals
-	resp, err = gs.httpClient.R().
-		SetResult(&wthdrwls).
-		Get("/api/user/withdrawals")
-	assert.NoError(gs.T(), err)
-	assert.Equal(gs.T(), http.StatusOK, resp.StatusCode())
-	assert.Equal(gs.T(), 1, len(wthdrwls))
-
-	assert.Equal(gs.T(), orderWithdraw, wthdrwls[0].Order)
-	assert.Equal(gs.T(), 101.04, wthdrwls[0].Sum)
-
-	cancel()
-	wg.Wait()
+			return blnc.Current == float64(100) &&
+				blnc.Withdrawn == float64(0)
+		}, gs.waitTimeout, gs.waitTick)
+	})
 }

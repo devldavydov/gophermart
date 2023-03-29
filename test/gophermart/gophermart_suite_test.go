@@ -1,8 +1,10 @@
 package gophermart
 
 import (
+	"context"
 	"net/http/cookiejar"
 	"os"
+	"sync"
 	"testing"
 	"time"
 
@@ -24,6 +26,9 @@ type GophermartSuite struct {
 	accrualSrvListenAddr string
 	waitTimeout          time.Duration
 	waitTick             time.Duration
+	wg                   sync.WaitGroup
+	accrualStop          context.CancelFunc
+	accrualMock          *AccrualMock
 }
 
 func (gs *GophermartSuite) SetupSuite() {
@@ -34,12 +39,23 @@ func (gs *GophermartSuite) SetupSuite() {
 
 	gs.gCli = gophermart.NewClient(os.Getenv(_envGophermartSrvAddr))
 
-	gs.accrualSrvListenAddr = os.Getenv(_envAccrualSrvListenAddr)
+	ctx, stop := context.WithCancel(context.Background())
+	gs.accrualMock = NewAccrualMock(os.Getenv(_envAccrualSrvListenAddr))
+
+	gs.wg.Add(1)
+	go func() {
+		defer gs.wg.Done()
+		gs.accrualMock.Start(ctx)
+	}()
+
+	gs.accrualStop = stop
 	gs.waitTimeout = 1 * time.Minute
 	gs.waitTick = 1 * time.Second
 }
 
 func (gs *GophermartSuite) TearDownSuite() {
+	gs.accrualStop()
+	gs.wg.Wait()
 }
 
 func TestGophermartIntegration(t *testing.T) {

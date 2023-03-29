@@ -3,6 +3,7 @@ package gophermart
 import (
 	"context"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -11,13 +12,14 @@ import (
 type AccrualMockResp map[string]map[string]interface{}
 
 type AccrualMock struct {
+	mu            sync.RWMutex
 	respMap       AccrualMockResp
 	listenAddress string
 }
 
-func NewAccrualMock(respMap AccrualMockResp, listenAddress string) *AccrualMock {
+func NewAccrualMock(listenAddress string) *AccrualMock {
 	return &AccrualMock{
-		respMap:       respMap,
+		respMap:       make(AccrualMockResp),
 		listenAddress: listenAddress,
 	}
 }
@@ -40,10 +42,23 @@ func (am *AccrualMock) Start(ctx context.Context) {
 	httpServer.Shutdown(hCtx)
 }
 
-func (am *AccrualMock) handlerOrder(c *gin.Context) {
-	number := c.Param("number")
+func (am *AccrualMock) SetRespMap(respMap AccrualMockResp) {
+	data := make(AccrualMockResp, len(respMap))
+	for k, v := range respMap {
+		data[k] = v
+	}
 
-	resp, ok := am.respMap[number]
+	am.mu.Lock()
+	defer am.mu.Unlock()
+
+	am.respMap = respMap
+}
+
+func (am *AccrualMock) handlerOrder(c *gin.Context) {
+	am.mu.RLock()
+	defer am.mu.RUnlock()
+
+	resp, ok := am.respMap[c.Param("number")]
 	if !ok {
 		c.Status(http.StatusNoContent)
 	} else {
