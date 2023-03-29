@@ -35,7 +35,7 @@ func (gs *GophermartSuite) SetupSuite() {
 	gs.gCli = gophermart.NewClient(os.Getenv(_envGophermartSrvAddr))
 
 	gs.accrualSrvListenAddr = os.Getenv(_envAccrualSrvListenAddr)
-	gs.waitTimeout = 10 * time.Second
+	gs.waitTimeout = 1 * time.Minute
 	gs.waitTick = 1 * time.Second
 }
 

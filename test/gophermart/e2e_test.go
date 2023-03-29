@@ -9,11 +9,11 @@ import (
 	"github.com/ShiraazMoollatjie/goluhn"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func (gs *GophermartSuite) TestE2EOrderInvalid() {
-	userLogin, userPassword := uuid.NewString(), uuid.NewString()
-	gs.userRegister(userLogin, userPassword, http.StatusOK)
+	require.NoError(gs.T(), gs.gCli.UserRegister(uuid.NewString(), uuid.NewString()))
 
 	orderNum := goluhn.Generate(10)
 
@@ -21,20 +21,19 @@ func (gs *GophermartSuite) TestE2EOrderInvalid() {
 	cancel := gs.startAccrualMock(&wg, AccrualMockResp{orderNum: {"order": orderNum, "status": "INVALID"}})
 
 	gs.Run("add order", func() {
-		gs.userAddOrder(orderNum, http.StatusAccepted)
+		gs.NoError(gs.gCli.AddOrder(orderNum))
 	})
 
-	gs.Eventually(
-		func() bool {
-			return gs.Run("wait order status changed", func() {
-				lst := gs.userGetOrders(http.StatusOK)
-				gs.Equal(1, len(lst))
-				gs.Equal("INVALID", lst[0].Status)
-				gs.Equal(orderNum, lst[0].Number)
-			})
-		},
-		gs.waitTimeout, gs.waitTick,
-	)
+	gs.Run("wait order status changed", func() {
+		gs.Eventually(func() bool {
+			lst, err := gs.gCli.GetOrders()
+			if err != nil {
+				return false
+			}
+
+			return len(lst) == 1 && lst[0].Status == "INVALID" && lst[0].Number == orderNum
+		}, gs.waitTimeout, gs.waitTick)
+	})
 
 	cancel()
 	wg.Wait()
