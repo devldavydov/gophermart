@@ -83,6 +83,94 @@ func (c *Client) GetBalance() (*UserBalance, error) {
 	return &blnc, nil
 }
 
+func (c *Client) GetBalanceWithdrawals() (UserBalanceWithdrawals, error) {
+	var wthdrwls UserBalanceWithdrawals
+	resp, err := c.httpClient.R().
+		SetResult(&wthdrwls).
+		Get("/api/user/withdrawals")
+	if err != nil {
+		return nil, err
+	}
+
+	if err = checkCommonError(resp.StatusCode()); err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode() == http.StatusNoContent {
+		return nil, ErrNoBalanceWithdrawals
+	}
+
+	return wthdrwls, nil
+}
+
+func (c *Client) BalanceWithdraw(orderNum string, sum float64) error {
+	resp, err := c.httpClient.R().
+		SetBody(userBalanceWithdraw{Order: orderNum, Sum: sum}).
+		Post("/api/user/balance/withdraw")
+	if err != nil {
+		return err
+	}
+
+	if err = checkCommonError(resp.StatusCode()); err != nil {
+		return err
+	}
+
+	switch resp.StatusCode() {
+	case http.StatusUnprocessableEntity:
+		return ErrBalanceWithdrawWrongFormat
+	case http.StatusPaymentRequired:
+		return ErrBalanceWithdrawPaymentRequired
+	default:
+		return nil
+	}
+}
+
+func (c *Client) AddOrder(orderNum string) error {
+	resp, err := c.httpClient.R().
+		SetBody(orderNum).
+		SetHeader("Content-Type", "text/plain").
+		Post("/api/user/orders")
+	if err != nil {
+		return err
+	}
+
+	if err = checkCommonError(resp.StatusCode()); err != nil {
+		return err
+	}
+
+	switch resp.StatusCode() {
+	case http.StatusUnprocessableEntity:
+		return ErrOrderWrongFormat
+	case http.StatusConflict:
+		return ErrOrderAlreadyExists
+	case http.StatusOK:
+		return ErrOrderAlreadyAccepted
+	default:
+		return nil
+	}
+}
+
+func (c *Client) GetOrders() (OrderList, error) {
+	var lst OrderList
+	resp, err := c.httpClient.R().
+		SetResult(&lst).
+		Get("/api/user/orders")
+
+	if err != nil {
+		return nil, err
+	}
+
+	if err = checkCommonError(resp.StatusCode()); err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode() == http.StatusNoContent {
+		return nil, ErrNoOrders
+	}
+
+	return lst, nil
+}
+
 func checkCommonError(statusCode int) error {
 	switch statusCode {
 	case http.StatusUnauthorized:

@@ -1,51 +1,39 @@
 package gophermart
 
 import (
-	"net/http"
-
 	"github.com/ShiraazMoollatjie/goluhn"
+	"github.com/devldavydov/gophermart/pkg/gophermart"
 	"github.com/google/uuid"
+	"github.com/stretchr/testify/require"
 )
 
 func (gs *GophermartSuite) TestOrderApi() {
-	userLogin, userPassword := uuid.NewString(), uuid.NewString()
 	orderNums := []string{goluhn.Generate(10), goluhn.Generate(10)}
 
-	gs.userRegister(userLogin, userPassword, http.StatusOK)
-
-	gs.Run("add order wrong request", func() {
-		resp, err := gs.httpClient.R().
-			SetBody(userAuth{Login: userLogin, Password: userPassword}).
-			Post("/api/user/orders")
-		gs.NoError(err)
-		gs.Equal(http.StatusBadRequest, resp.StatusCode())
-	})
+	require.NoError(gs.T(), gs.gCli.UserRegister(uuid.NewString(), uuid.NewString()))
 
 	gs.Run("add order wrong format", func() {
-		resp, err := gs.httpClient.R().
-			SetBody("123").
-			SetHeader("Content-Type", "text/plain").
-			Post("/api/user/orders")
-		gs.NoError(err)
-		gs.Equal(http.StatusUnprocessableEntity, resp.StatusCode())
+		gs.ErrorIs(gophermart.ErrOrderWrongFormat, gs.gCli.AddOrder("123"))
 	})
 
 	gs.Run("get empty orders list", func() {
-		gs.userGetOrders(http.StatusNoContent)
+		_, err := gs.gCli.GetOrders()
+		gs.ErrorIs(gophermart.ErrNoOrders, err)
 	})
 
 	gs.Run("add orders", func() {
 		for _, orderNum := range orderNums {
-			gs.userAddOrder(orderNum, http.StatusAccepted)
+			gs.NoError(gs.gCli.AddOrder(orderNum))
 		}
 	})
 
 	gs.Run("add same order", func() {
-		gs.userAddOrder(orderNums[0], http.StatusOK)
+		gs.ErrorIs(gophermart.ErrOrderAlreadyAccepted, gs.gCli.AddOrder(orderNums[0]))
 	})
 
 	gs.Run("get orders list", func() {
-		lst := gs.userGetOrders(http.StatusOK)
+		lst, err := gs.gCli.GetOrders()
+		gs.NoError(err)
 		gs.Equal(2, len(lst))
 
 		gs.Equal(orderNums[0], lst[0].Number)
@@ -55,7 +43,7 @@ func (gs *GophermartSuite) TestOrderApi() {
 	})
 
 	gs.Run("add existing order from another user", func() {
-		gs.userRegister(uuid.NewString(), uuid.NewString(), http.StatusOK)
-		gs.userAddOrder(orderNums[0], http.StatusConflict)
+		gs.NoError(gs.gCli.UserRegister(uuid.NewString(), uuid.NewString()))
+		gs.ErrorIs(gophermart.ErrOrderAlreadyExists, gs.gCli.AddOrder(orderNums[0]))
 	})
 }
