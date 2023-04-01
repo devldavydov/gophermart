@@ -23,10 +23,12 @@ func (gs *GophermartSuite) TestBalanceApi() {
 	})
 
 	gs.Run("balance withdraw wrong format", func() {
-		gs.ErrorIs(gophermart.ErrBalanceWithdrawWrongFormat, gs.gCli.BalanceWithdraw("123", 123))
+		err := gs.gCli.BalanceWithdraw("123", 123)
+		gs.ErrorIs(gophermart.ErrBalanceWithdrawWrongFormat, err)
 	})
 
 	gs.Run("balance withdraw not enough balance", func() {
-		gs.ErrorIs(gophermart.ErrBalanceWithdrawPaymentRequired, gs.gCli.BalanceWithdraw(goluhn.Generate(10), 123))
+		err := gs.gCli.BalanceWithdraw(goluhn.Generate(10), 123)
+		gs.ErrorIs(gophermart.ErrBalanceWithdrawPaymentRequired, err)
 	})
 }
