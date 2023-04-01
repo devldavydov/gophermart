@@ -4,6 +4,9 @@
 *.dll
 *.so
 *.dylib
+gophermarttest
+statictest
+random
 
 # Test binary, built with `go test -c`
 *.test
